@@ -110,9 +110,9 @@ if __name__ == '__main__':
     try:
 	import dbus
 	knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
-	knotify.event("warning", "kde", [], 
+	knotify.event("warning", "autosync application", [],
 	    'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS', 
-	    [], [], 0, dbus_interface="org.kde.KNotify")
+	    [], [], 0, dbus_interface='org.kde.KNotify')
 	desktopnotifykde = True
     except:
 	print 'KDE4 KNotify does not seem to run or dbus is not installed'
