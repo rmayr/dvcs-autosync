@@ -46,19 +46,28 @@ class OnWriteHandler(pyinotify.ProcessEvent):
         self.ignored = ignored
         self.cmd = cmd
 
-    def _run_cmd(self):
-        print '==> Modification detected'
-#        subprocess.call(self.cmd.split(' '), cwd=self.cwd)
-
-    def process_IN_MODIFY(self, event):
-#        if all(not event.pathname.endswith(ext) for ext in self.extensions):
+    def _run_cmd(self, event, action):
+	path = event.pathname
+	if event.dir:
+	    print 'Ignoring change to directory ' + path
+	    return
+#        if all(not path.endswith(ext) for ext in self.extensions):
 #            return
 
 	if desktopnotify:
-	    n = pynotify.Notification('Local change', 'Committing changes in ' + event.pathname)
+	    n = pynotify.Notification('Local change', 'Committing changes in ' + path + " : " + action)
 	    n.show()
 	
-        self._run_cmd()
+#        subprocess.call(self.cmd.split(' '), cwd=self.cwd)
+
+    def process_IN_DELETE(self, event):
+	self._run_cmd(event, 'rm')
+
+    def process_IN_CREATE(self, event):
+        self._run_cmd(event, 'add')
+
+    def process_IN_MODIFY(self, event):
+        self._run_cmd(event, 'add')
 
 def auto_compile(path, pidfile, cmd, ignored):
     wm = pyinotify.WatchManager()
