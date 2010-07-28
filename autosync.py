@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # Usage:
-#   ./autosync.py path pidfile ignores
+#   ./autosync.py [config file, default is ~/.autosync]
 #
 # Background monitoring |path| and its subdirectories for modifications on
 # files and automatically commits the changes to git. This script assumes
@@ -18,8 +18,14 @@
 # Example:
 #   ./autosync.py /my-git-work-tree
 #
-# Dependancies:
-#   Linux, Python 2.6, Pyinotify, JabberBot
+# Note that for Jabber login, there probably needs to be a 
+# _xmpp-client._tcp.<domain name of jabber account> SRV entry in DNS so that 
+# the Python XMPP module can look up the server and port to use. Without such 
+# an SRV entry, Jabber login may fail even if the account details are correct 
+# and the server is reachable.
+#
+# Dependencies:
+#   Linux, Python 2.6, Pyinotify, JabberBot (>= 0.9)
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
@@ -27,7 +33,7 @@ import sys, os, functools, threading, ConfigParser
 #import subprocess
 import pyinotify
 import jabberbot
-#botcmd = jabberbot.botcmd
+botcmd = jabberbot.botcmd
 
 # some global variables, will be initialized in main
 desktopnotifykde = False
@@ -44,11 +50,11 @@ def printmsg(title, msg):
 	print title + ': ' + msg
       
 
-#class AutosyncJabberBot(jabberbot.JabberBot):
-    #@botcmd
-    #def whoami( self, mess, args):
-        #"""Tells you your username"""
-        #return mess.getFrom()
+class AutosyncJabberBot(jabberbot.JabberBot):
+    @botcmd
+    def whoami( self, mess, args):
+        """Tells you your username"""
+        return mess.getFrom()
 
 class OnWriteHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
@@ -87,17 +93,28 @@ def auto_compile(path, pidfile, ignored):
 
 if __name__ == '__main__':
     config = ConfigParser.RawConfigParser()
+    defaultcfgpath = os.path.expanduser('~/.autosync')
     if len(sys.argv) >= 2:
-	config.read([sys.argv[1], '~/.autosync'])
+	config.read([sys.argv[1], defaultcfgpath])
     else:
-	config.read('~/.autosync')
+	config.read(defaultcfgpath)
 
-    # Required arguments
-    path = config.get('autosync', 'path')
+    pathstr = config.get('autosync', 'path')
+    path = os.path.normpath(os.path.expanduser(pathstr))
+    if os.path.isdir(path):
+	print 'Watching path ' + path
+    else:
+	print 'Error: path ' + path + ' (expanded from ' + pathstr + ') does not exist'
+	os.exit(1)
+    
     pidfile = config.get('autosync', 'pidfile')
-
-    # Optional argument
+    ignorepaths = config.get('autosync', 'ignorepath')
+    
+    # TODO: this is currently git-specific, should be configurable
     ignorefile = os.path.join(path, '.gitignore')
+
+    # TODO: use ignore paths as well
+
     if os.path.exists(ignorefile):
 	excl = pyinotify.ExcludeFilter(ignorefile)
     else:
@@ -117,7 +134,7 @@ if __name__ == '__main__':
     try:
 	import pynotify
 	if pynotify.init('autosync application'):
-	    print 'pynotify initializd successfully, will use desktop notifications'
+	    print 'pynotify initialized successfully, will use desktop notifications'
 	    desktopnotifygnome = True
 	else:
 	    print 'there was a problem initializing the pynotify module'
@@ -126,11 +143,17 @@ if __name__ == '__main__':
 	
     username = config.get('jabber', 'username')
     password = config.get('jabber', 'password')
-    #bot = AutosyncJabberBot(username,password)
-    #bot.send(username, 'Logged into jabber account')
-    #th = threading.Thread( target = bc.thread_proc)
-    #bot.serve_forever(connect_callback = lambda: th.start())
-    #bc.thread_killed = True
+    try:
+	bot = AutosyncJabberBot(username,password)
+	bot.send(username, 'Logged into jabber account')
+	th = threading.Thread( target = bc.thread_proc)
+	bot.serve_forever(connect_callback = lambda: th.start())
+	bc.thread_killed = True
+	printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
+    except Exception as inst:
+	print type(inst)
+	print inst
+	printmsg('Autosync Jabber login failed', 'Could not login to Jabber account ' + username + '. Will not announce pushes to other running autosync instances.')	
 
     printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
 
