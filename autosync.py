@@ -59,9 +59,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
     def _process_thread(self):
 	print 'Background Jabber bot thread starting'
 	while self.__running:
-	    print 'Waiting to process an XMPP message'
 	    self.conn.Process(1)
-	    print 'Processed an XMPP message'
 	    self.idle_proc()
 
     def start_serving(self):
