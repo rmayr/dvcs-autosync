@@ -107,15 +107,16 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             return
 
 	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
+	self.exec_cmd(action + ' ' + curpath)
 
     def process_IN_DELETE(self, event):
-	self._run_cmd(event, 'rm')
+	self._run_cmd(event, cmd_delete)
 
     def process_IN_CREATE(self, event):
-        self._run_cmd(event, 'add')
+        self._run_cmd(event, cmd_add)
 
     def process_IN_MODIFY(self, event):
-        self._run_cmd(event, 'add')
+        self._run_cmd(event, cmd_modify)
         
     # TODO: implement moved
     # TODO: react to attribute changes as well
