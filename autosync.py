@@ -107,19 +107,27 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             return
 
 	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
-	self.exec_cmd(action + ' ' + curpath)
+	self.exec_cmd(action)
 
     def process_IN_DELETE(self, event):
-	self._run_cmd(event, cmd_delete)
+	self._run_cmd(event, cmd_rm + ' ' + event.pathname)
 
     def process_IN_CREATE(self, event):
-        self._run_cmd(event, cmd_add)
+        self._run_cmd(event, cmd_add + ' ' + event.pathname)
 
     def process_IN_MODIFY(self, event):
-        self._run_cmd(event, cmd_modify)
-        
-    # TODO: implement moved
-    # TODO: react to attribute changes as well
+        self._run_cmd(event, cmd_modify + ' ' + event.pathname)
+
+    def process_IN_ATTRIB(self, event):
+        self._run_cmd(event, cmd_modify + ' ' + event.pathname)
+
+    def process_IN_MOVED_TO(self, event):
+	if event.src_pathname:
+	    print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
+	    self._run_cmd(event, cmd_move + ' ' + event.src_pathname + ' ' + event.pathname)
+	else:
+	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
+	    self._run_cmd(event, cmd_add + ' ' + event.pathname)
 
 def signal_handler(signal, frame):
         print 'You pressed Ctrl+C, exiting gracefully!'
