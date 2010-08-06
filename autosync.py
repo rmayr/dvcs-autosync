@@ -12,9 +12,6 @@
 # and files matching any of the patterns are ignored. This will typically be
 # the .gitignore file already existing the git tree.
 #
-# It is an adapted and slightly extended version of the autocompile.py script
-# distributed as a pyinotify example with the daemon.py script mixed in.
-#
 # Example:
 #   ./autosync.py /my-git-work-tree
 #
@@ -24,14 +21,22 @@
 # an SRV entry, Jabber login may fail even if the account details are correct 
 # and the server is reachable.
 #
+# Note, when there are errors 
+#  ERROR:pyinotify:add_watch: cannot watch ...
+# on startup, it will either be an invalid file or directory name which can 
+# not be watched for changes, or the number of files a user may watch 
+# concurrently using the kernel inotify interface has reached the set limit.
+# In the latter case, the limit can be changed by modifying the sysctl variable
+# fs.inotify.max_user_watches and increasing it to a sufficient value 
+# (e.g. 500000).
+#
 # Dependencies:
 #   Linux, Python 2.6, Pyinotify, JabberBot (>= 0.9)
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
-import sys, os, functools, threading, ConfigParser
+import sys, os, fnmatch, pyinotify, ConfigParser
 #import subprocess
-import pyinotify
 import jabberbot
 botcmd = jabberbot.botcmd
 
@@ -81,15 +86,9 @@ class OnWriteHandler(pyinotify.ProcessEvent):
 
     def process_IN_MODIFY(self, event):
         self._run_cmd(event, 'add')
-
-def auto_compile(path, pidfile, ignored):
-    wm = pyinotify.WatchManager()
-    handler = OnWriteHandler(cwd=path, ignored=ignored)
-    notifier = pyinotify.Notifier(wm, default_proc_fun=handler)
-    wm.add_watch(path, pyinotify.ALL_EVENTS, rec=True, auto_add=True)
-    print '==> Start monitoring %s (type c^c to exit)' % path
-    # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
-    notifier.loop()
+        
+    # TODO: implement moved
+    # TODO: react to attribute changes as well
 
 if __name__ == '__main__':
     config = ConfigParser.RawConfigParser()
@@ -112,24 +111,34 @@ if __name__ == '__main__':
     
     # TODO: this is currently git-specific, should be configurable
     ignorefile = os.path.join(path, '.gitignore')
-
-    # TODO: use ignore paths as well
-
+    # load the patterns and match them internally with fnmatch
     if os.path.exists(ignorefile):
-	excl = pyinotify.ExcludeFilter(ignorefile)
+	f = open(ignorefile, 'r')
+	ignorefilepatterns = f.readlines()
+	f.close()
     else:
-	excl = None
+	ignoefilepatterns = []
+    # (unfortunately, can't use pyinotify.ExcludeFilter, because this expects regexes (which .gitignore doesn't support))
+
+    # but we can use the ignore filter with our own pathname excludes
+    # However, need to prepend the watch path name, as the excludes need to be 
+    # absolute path names.
+    ignoreabsolutepaths = [os.path.normpath(path + os.sep + ignorepath) for ignorepath in ignorepaths.split()]
+    print 'Adding list to inotify exclude filter: '
+    print ignoreabsolutepaths
+    excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
 
     # try to set up desktop notification, first for KDE4, then for Gnome
-    try:
-	import dbus
-	knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
-	knotify.event("warning", "autosync application", [],
-	    'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS', 
-	    [], [], 0, dbus_interface='org.kde.KNotify')
-	desktopnotifykde = True
-    except:
-	print 'KDE4 KNotify does not seem to run or dbus is not installed'
+    # the signature is not correct, so rely on pynotify only at the moment
+    #try:
+	#import dbus
+	#knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
+	#knotify.event("warning", "autosync application", [],
+	    #'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS', 
+	    #[], [], 0, dbus_interface='org.kde.KNotify')
+	#desktopnotifykde = True
+    #except:
+	#print 'KDE4 KNotify does not seem to run or dbus is not installed'
     
     try:
 	import pynotify
@@ -157,5 +166,18 @@ if __name__ == '__main__':
 
     printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
 
-    # Blocks monitoring
-    auto_compile(path, pidfile, excl)
+    wm = pyinotify.WatchManager()
+    handler = OnWriteHandler(cwd=path, ignored=ignorefilepatterns)
+    notifier = pyinotify.Notifier(wm, default_proc_fun=handler)
+    mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_MODIFY | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
+    try:
+	wd = wm.add_watch(path, mask, rec=True, auto_add=True, quiet=False, exclude_filter=excl)
+	if wd <= 0:
+	    print 'Unable to add watch for path %s - this will not work' % path
+    except pyinotify.WatchManagerError, err:
+	print err, err.wmd
+	
+    print '==> Start monitoring %s (type c^c to exit)' % path
+    # TODO: daemonize
+    # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
+    notifier.loop()
