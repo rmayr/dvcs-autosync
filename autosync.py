@@ -54,6 +54,7 @@ def printmsg(title, msg):
     else:
 	print title + ': ' + msg
 
+
 class AutosyncJabberBot(jabberbot.JabberBot):
     def _process_thread(self):
 	while not self.__finished:
@@ -61,7 +62,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 	    self.idle_proc()
 
     def start_serving(self):
-	self.conn = self.connect()
+	self.connect()
         if self.conn:
             self.log('bot connected. serving forever.')
         else:
@@ -203,8 +204,8 @@ if __name__ == '__main__':
     password = config.get('jabber', 'password')
     try:
 	bot = AutosyncJabberBot(username,password)
-	bot.send(username, 'Logged into jabber account')
 	bot.start_serving()
+	bot.send(username, 'Logged into jabber account')
 	printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
     except Exception as inst:
 	print type(inst)
