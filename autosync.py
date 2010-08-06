@@ -208,6 +208,7 @@ if __name__ == '__main__':
 	bot = AutosyncJabberBot(username,password)
 	bot.start_serving()
 	bot.send(username, 'Logged into jabber account')
+	bot.send('r@doc.to', 'Testing now')
 	printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
     except Exception as inst:
 	print type(inst)
@@ -216,7 +217,9 @@ if __name__ == '__main__':
 
     wm = pyinotify.WatchManager()
     handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
-    notifier = pyinotify.ThreadedNotifier(wm, handler, read_freq=readfrequency)
+    # TODO: frequency doesn't work....
+    #notifier = pyinotify.ThreadedNotifier(wm, handler, read_freq=readfrequency)
+    notifier = pyinotify.ThreadedNotifier(wm, handler)
     # coalescing events needs pyinotify >= 0.9, so make this optional
     try:
 	notifier.coalesce_events()
