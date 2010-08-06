@@ -35,7 +35,7 @@
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
-import sys, signal, os, time, subprocess, fnmatch, pyinotify, ConfigParser, jabberbot
+import sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, jabberbot
 botcmd = jabberbot.botcmd
 
 # some global variables, will be initialized in main
@@ -43,6 +43,7 @@ desktopnotifykde = False
 desktopnotifygnome = False
 knotify = None
 notifier = None
+bot = None
 
 def printmsg(title, msg):
     if desktopnotifygnome:
@@ -54,6 +55,26 @@ def printmsg(title, msg):
 	print title + ': ' + msg
 
 class AutosyncJabberBot(jabberbot.JabberBot):
+    def _process_thread(self):
+	while not self.__finished:
+	    self.conn.Process(1)
+	    self.idle_proc()
+
+    def start_serving(self):
+	self.conn = self.connect()
+        if self.conn:
+            self.log('bot connected. serving forever.')
+        else:
+            self.log('could not connect to server - aborting.')
+            return
+
+	self.thread = threading.Thread(target = self._process_thread)
+	self.thread.start()
+
+    def stop_serving(self):
+	self.__finished = True
+	self.thread.join()
+  
     @botcmd
     def whoami( self, mess, args):
         """Tells you your username"""
@@ -98,7 +119,10 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 
 def signal_handler(signal, frame):
         print 'You pressed Ctrl+C, exiting gracefully!'
-        notifier.stop()
+        if notifier:
+	    notifier.stop()
+	if bot:
+	    bot.stop_serving()
         sys.exit(0)
 
 if __name__ == '__main__':
@@ -180,9 +204,7 @@ if __name__ == '__main__':
     try:
 	bot = AutosyncJabberBot(username,password)
 	bot.send(username, 'Logged into jabber account')
-	th = threading.Thread( target = bc.thread_proc)
-	bot.serve_forever(connect_callback = lambda: th.start())
-	#bc.thread_killed = True
+	bot.start_serving()
 	printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
     except Exception as inst:
 	print type(inst)
