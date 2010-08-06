@@ -35,7 +35,7 @@
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
-import sys, os, fnmatch, pyinotify, ConfigParser
+import sys, os, fnmatch, pyinotify, asyncore, ConfigParser
 #import subprocess
 import jabberbot
 botcmd = jabberbot.botcmd
@@ -61,20 +61,21 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         """Tells you your username"""
         return mess.getFrom()
 
-class OnWriteHandler(pyinotify.ProcessEvent):
+class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
         self.cwd = cwd
         self.ignored = ignored
 
     def _run_cmd(self, event, action):
-	path = event.pathname
+	curpath = event.pathname
 	if event.dir:
-	    print 'Ignoring change to directory ' + path
+	    print 'Ignoring change to directory ' + curpath
 	    return
-#        if all(not path.endswith(ext) for ext in self.extensions):
-#            return
+        if any(fnmatch.fnmatch(curpath, pattern) for pattern in self.ignored):
+	    print 'Ignoring change to file %s because it matches the ignored patterns from .gitignore' % curpath
+            return
 
-	printmsg('Local change', 'Committing changes in ' + path + " : " + action)
+	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
 	
 #        subprocess.call(self.cmd.split(' '), cwd=self.cwd)
 
@@ -114,11 +115,12 @@ if __name__ == '__main__':
     # load the patterns and match them internally with fnmatch
     if os.path.exists(ignorefile):
 	f = open(ignorefile, 'r')
-	ignorefilepatterns = f.readlines()
+	ignorefilepatterns = [pat.strip() for pat in f.readlines()]
 	f.close()
     else:
 	ignoefilepatterns = []
     # (unfortunately, can't use pyinotify.ExcludeFilter, because this expects regexes (which .gitignore doesn't support))
+    print 'Ignoring files matching any of the patterns ' + ' '.join(ignorefilepatterns)
 
     # but we can use the ignore filter with our own pathname excludes
     # However, need to prepend the watch path name, as the excludes need to be 
@@ -164,20 +166,22 @@ if __name__ == '__main__':
 	print inst
 	printmsg('Autosync Jabber login failed', 'Could not login to Jabber account ' + username + '. Will not announce pushes to other running autosync instances.')	
 
-    printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
-
     wm = pyinotify.WatchManager()
-    handler = OnWriteHandler(cwd=path, ignored=ignorefilepatterns)
-    notifier = pyinotify.Notifier(wm, default_proc_fun=handler)
+    handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
+    notifier = pyinotify.AsyncNotifier(wm, handler)
     mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_MODIFY | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
     try:
+	print 'Adding recursive, auto-adding watch for path %s with event mask %d' % (path, mask)
 	wd = wm.add_watch(path, mask, rec=True, auto_add=True, quiet=False, exclude_filter=excl)
 	if wd <= 0:
 	    print 'Unable to add watch for path %s - this will not work' % path
     except pyinotify.WatchManagerError, err:
 	print err, err.wmd
-	
+
+    printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
+
     print '==> Start monitoring %s (type c^c to exit)' % path
     # TODO: daemonize
     # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
-    notifier.loop()
+    #notifier.loop()
+    asyncore.loop()
