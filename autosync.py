@@ -35,15 +35,14 @@
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
-import sys, os, fnmatch, pyinotify, asyncore, ConfigParser
-#import subprocess
-import jabberbot
+import sys, signal, os, time, subprocess, fnmatch, pyinotify, ConfigParser, jabberbot
 botcmd = jabberbot.botcmd
 
 # some global variables, will be initialized in main
 desktopnotifykde = False
 desktopnotifygnome = False
 knotify = None
+notifier = None
 
 def printmsg(title, msg):
     if desktopnotifygnome:
@@ -53,7 +52,6 @@ def printmsg(title, msg):
 	knotify.event('info', 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
     else:
 	print title + ': ' + msg
-      
 
 class AutosyncJabberBot(jabberbot.JabberBot):
     @botcmd
@@ -61,10 +59,19 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         """Tells you your username"""
         return mess.getFrom()
 
+    @botcmd
+    def ping( self, mess, args):
+	print 'Received ping command over Jabber channel'
+        return 'pong'
+
+
 class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
         self.cwd = cwd
         self.ignored = ignored
+        
+    def exec_cmd(self, command):
+	subprocess.call(command.split(' '), cwd=self.cwd)
 
     def _run_cmd(self, event, action):
 	curpath = event.pathname
@@ -76,8 +83,6 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             return
 
 	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
-	
-#        subprocess.call(self.cmd.split(' '), cwd=self.cwd)
 
     def process_IN_DELETE(self, event):
 	self._run_cmd(event, 'rm')
@@ -90,6 +95,11 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         
     # TODO: implement moved
     # TODO: react to attribute changes as well
+
+def signal_handler(signal, frame):
+        print 'You pressed Ctrl+C, exiting gracefully!'
+        notifier.stop()
+        sys.exit(0)
 
 if __name__ == '__main__':
     config = ConfigParser.RawConfigParser()
@@ -109,6 +119,17 @@ if __name__ == '__main__':
     
     pidfile = config.get('autosync', 'pidfile')
     ignorepaths = config.get('autosync', 'ignorepath')
+    readfrequency = config.get('autosync', 'readfrequency')
+    
+    # Read required DCVS commands
+    cmd_startup = config.get('dcvs', 'startupcmd')
+    cmd_commit = config.get('dcvs', 'commitcmd')
+    cmd_push = config.get('dcvs', 'pushcmd')
+    cmd_pull = config.get('dcvs', 'pullcmd')
+    cmd_add = config.get('dcvs', 'addcmd')
+    cmd_rm = config.get('dcvs', 'rmcmd')
+    cmd_modify = config.get('dcvs', 'modifycmd')
+    cmd_move = config.get('dcvs', 'movecmd')
     
     # TODO: this is currently git-specific, should be configurable
     ignorefile = os.path.join(path, '.gitignore')
@@ -129,6 +150,8 @@ if __name__ == '__main__':
     print 'Adding list to inotify exclude filter: '
     print ignoreabsolutepaths
     excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
+
+    signal.signal(signal.SIGINT, signal_handler)
 
     # try to set up desktop notification, first for KDE4, then for Gnome
     # the signature is not correct, so rely on pynotify only at the moment
@@ -159,7 +182,7 @@ if __name__ == '__main__':
 	bot.send(username, 'Logged into jabber account')
 	th = threading.Thread( target = bc.thread_proc)
 	bot.serve_forever(connect_callback = lambda: th.start())
-	bc.thread_killed = True
+	#bc.thread_killed = True
 	printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
     except Exception as inst:
 	print type(inst)
@@ -168,7 +191,12 @@ if __name__ == '__main__':
 
     wm = pyinotify.WatchManager()
     handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
-    notifier = pyinotify.AsyncNotifier(wm, handler)
+    notifier = pyinotify.ThreadedNotifier(wm, handler, read_freq=readfrequency)
+    # coalescing events needs pyinotify >= 0.9, so make this optional
+    try:
+	notifier.coalesce_events()
+    except AttributeError as inst:
+	print 'Can not coalesce events, pyinotify does not seem to support it (maybe to old): %s' % inst
     mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_MODIFY | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
     try:
 	print 'Adding recursive, auto-adding watch for path %s with event mask %d' % (path, mask)
@@ -183,5 +211,15 @@ if __name__ == '__main__':
     print '==> Start monitoring %s (type c^c to exit)' % path
     # TODO: daemonize
     # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
-    #notifier.loop()
-    asyncore.loop()
+    notifier.start()
+
+    print 'Fetching updates from remote now: ' + cmd_pull
+    handler.exec_cmd(cmd_pull)
+    print 'Running startup command to check for local changes now: ' + cmd_startup
+    handler.exec_cmd(cmd_startup)
+    print 'Committing and pushing local changes now: ' + cmd_commit + ' and ' + cmd_push
+    handler.exec_cmd(cmd_commit)
+    handler.exec_cmd(cmd_push)
+
+    while True:
+	time.sleep(10)
