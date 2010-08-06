@@ -57,7 +57,7 @@ def printmsg(title, msg):
 
 class AutosyncJabberBot(jabberbot.JabberBot):
     def _process_thread(self):
-	while not self.__finished:
+	while self.__running:
 	    self.conn.Process(1)
 	    self.idle_proc()
 
@@ -69,12 +69,13 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             self.log('could not connect to server - aborting.')
             return
 
-	self.thread = threading.Thread(target = self._process_thread)
-	self.thread.start()
+	self.__running = True
+	self.__thread = threading.Thread(target = self._process_thread)
+	self.__thread.start()
 
     def stop_serving(self):
-	self.__finished = True
-	self.thread.join()
+	self.__running = False
+	self.__thread.join()
   
     @botcmd
     def whoami( self, mess, args):
