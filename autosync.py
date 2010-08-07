@@ -215,7 +215,7 @@ if __name__ == '__main__':
     username = config.get('jabber', 'username')
     password = config.get('jabber', 'password')
     try:
-	bot = AutosyncJabberBot(username, password, debug=True)
+	bot = AutosyncJabberBot(username, password, debug=False)
 	bot.start_serving()
 	bot.send(username, 'Logged into jabber account')
 	bot.send('r@doc.to', 'Testing now')
