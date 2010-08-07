@@ -94,8 +94,9 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         self.cwd = cwd
         self.ignored = ignored
         
-    def exec_cmd(self, command):
-	subprocess.call(command.split(' '), cwd=self.cwd)
+    def exec_cmd(self, commands):
+	for command in commands.split(';'):
+	    subprocess.call(command.split(' '), cwd=self.cwd)
 
     def _run_cmd(self, event, action):
 	curpath = event.pathname
@@ -110,24 +111,24 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	self.exec_cmd(action)
 
     def process_IN_DELETE(self, event):
-	self._run_cmd(event, cmd_rm + ' ' + event.pathname)
+	self._run_cmd(event, cmd_rm % event.pathname)
 
     def process_IN_CREATE(self, event):
-        self._run_cmd(event, cmd_add + ' ' + event.pathname)
+        self._run_cmd(event, cmd_add % event.pathname)
 
     def process_IN_MODIFY(self, event):
-        self._run_cmd(event, cmd_modify + ' ' + event.pathname)
+        self._run_cmd(event, cmd_modify % event.pathname)
 
     def process_IN_ATTRIB(self, event):
-        self._run_cmd(event, cmd_modify + ' ' + event.pathname)
+        self._run_cmd(event, cmd_modify % event.pathname)
 
     def process_IN_MOVED_TO(self, event):
 	if event.src_pathname:
 	    print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
-	    self._run_cmd(event, cmd_move + ' ' + event.src_pathname + ' ' + event.pathname)
+	    self._run_cmd(event, cmd_move % (event.src_pathname, event.pathname))
 	else:
 	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
-	    self._run_cmd(event, cmd_add + ' ' + event.pathname)
+	    self._run_cmd(event, cmd_add % event.pathname)
 
 def signal_handler(signal, frame):
         print 'You pressed Ctrl+C, exiting gracefully!'
