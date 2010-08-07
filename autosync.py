@@ -109,6 +109,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 
 	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
 	self.exec_cmd(action)
+	self.exec_cmd(cmd_commit)
 
     def process_IN_DELETE(self, event):
 	self._run_cmd(event, cmd_rm % event.pathname)
