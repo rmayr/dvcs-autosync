@@ -131,6 +131,106 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
 	    self._run_cmd(event, cmd_add % event.pathname)
 
+class ResettableTimer(threading.Thread):
+  """
+  The ResettableTimer class is a timer whose counting loop can be reset
+  arbitrarily. Its duration is configurable. Commands can be specified
+  for both expiration and update. Its update resolution can also be
+  specified. Resettable timer keeps counting until the "run" method
+  is explicitly killed with the "kill" method.
+  """
+  def __init__(self, maxtime, expire, inc=None, update=None):
+    """
+    @param maxtime: time in seconds before expiration after resetting
+                    in seconds
+    @param expire: function called when timer expires
+    @param inc: amount by which timer increments before
+                updating in seconds, default is maxtime/2
+    @param update: function called when timer updates
+    """
+    self.maxtime = maxtime
+    self.expire = expire
+    if inc:
+      self.inc = inc
+    else:
+      self.inc = maxtime/2
+    if update:
+      self.update = update
+    else:
+      self.update = lambda c : None
+    self.counter = 0
+    self.active = True
+    self.stop = False
+    threading.Thread.__init__(self)
+    self.setDaemon(True)
+  def set_counter(self, t):
+    """
+    Set self.counter to t.
+
+    @param t: new counter value
+    """
+    self.counter = t
+  def deactivate(self):
+    """
+    Set self.active to False.
+    """
+    self.active = False
+  def kill(self):
+    """
+    Will stop the counting loop before next update.
+    """
+    self.stop = True
+  def reset(self):
+    """
+    Fully rewinds the timer and makes the timer active, such that
+    the expire and update commands will be called when appropriate.
+    """
+    self.counter = 0
+    self.active = True
+
+  def run(self):
+    """
+    Run the timer loop.
+    """
+    while True:
+      self.counter = 0
+      while self.counter < self.maxtime:
+        self.counter += self.inc
+        time.sleep(self.inc)
+        if self.stop:
+          return
+        if self.active:
+          self.update(self.counter)
+      if self.active:
+        self.active = False
+        self.expire()
+
+class Relay:
+  def __init__(self, id):
+    self.id = id
+
+    print '** Starting ' + str(id) + ' ON for ' + str(TIMER_ON_TIME) + ' seconds'
+
+    self.timer = ResettableTimer(TIMER_ON_TIME, self.process_event)
+    self.timer.start()
+
+  # handle the relay switching on timer event
+  def process_event(self):
+
+    # execute some logic
+    # ...
+    # ...
+
+    print 'Inside event for Relay: ', str(self.id)
+
+    # reset the timer
+    self.timer.maxtime = TIMER_ON_TIME
+
+    # restart the timer
+    print '@ Restarting timer: ', str(self.id)
+    self.timer.reset()
+
+
 def signal_handler(signal, frame):
         print 'You pressed Ctrl+C, exiting gracefully!'
         if notifier:
@@ -138,6 +238,7 @@ def signal_handler(signal, frame):
 	if bot:
 	    bot.stop_serving()
         sys.exit(0)
+
 
 if __name__ == '__main__':
     config = ConfigParser.RawConfigParser()
@@ -215,11 +316,12 @@ if __name__ == '__main__':
 	
     username = config.get('jabber', 'username')
     password = config.get('jabber', 'password')
+    alsonotify = config.get('jabber', 'alsonotify')
     try:
 	bot = AutosyncJabberBot(username, password, debug=False)
 	bot.start_serving()
 	bot.send(username, 'Logged into jabber account')
-	bot.send('r@doc.to', 'Testing now')
+	bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
 	printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
     except Exception as inst:
 	print type(inst)
