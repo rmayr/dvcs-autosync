@@ -95,7 +95,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         self.ignored = ignored
         
     def exec_cmd(self, commands):
-	for command in commands.split(';'):
+	for command in commands.split('\n'):
 	    subprocess.call(command.split(' '), cwd=self.cwd)
 
     def _run_cmd(self, event, action):
