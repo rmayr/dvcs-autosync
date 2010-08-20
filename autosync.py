@@ -323,7 +323,7 @@ if __name__ == '__main__':
     password = config.get('jabber', 'password')
     alsonotify = config.get('jabber', 'alsonotify')
     try:
-	bot = AutosyncJabberBot(username, password, res='AutosyncJabberBot', debug=False)
+	bot = AutosyncJabberBot(username, password, res='AutosyncJabberBot on %s' % os.uname()[1], debug=False)
 	bot.start_serving()
 	bot.send(username, 'Logged into jabber account')
 	bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
