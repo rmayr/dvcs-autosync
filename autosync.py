@@ -155,14 +155,18 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 	self.__thread.join()
   
     @botcmd
-    def whoami( self, mess, args):
+    def whoami(self, mess, args):
         """Tells you your username"""
-        return mess.getFrom()
+        return 'You are %s, I am %s/%s' % (mess.getFrom(), self.jid, self.res)
 
     @botcmd
-    def ping( self, mess, args):
+    def ping(self, mess, args):
 	print 'Received ping command over Jabber channel'
         return 'pong'
+        
+    @botcmd
+    def pushed(self, mess, args):
+	print 'Received pushed command over Jabber channel with args %s (whole message %s)' % (args, mess)
 
 
 class FileChangeHandler(pyinotify.ProcessEvent):
@@ -231,8 +235,8 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	if bot:
 	    proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE)
 	    (remoteurl, errors) = proc.communicate()
-	    bot.send(username, 'PUSHED TO %s' % remoteurl)
-	    bot.send(alsonotify, 'PUSHED TO %s' % remoteurl)
+	    for sendto in [username, alsonotify]:
+		bot.send(sendto, 'pushed %s' % remoteurl)
 
 
 def signal_handler(signal, frame):
