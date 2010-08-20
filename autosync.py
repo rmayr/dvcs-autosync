@@ -35,7 +35,7 @@
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
-import sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, jabberbot
+import sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, jabberbot, xmpp
 botcmd = jabberbot.botcmd
 
 # some global variables, will be initialized in main
@@ -150,6 +150,9 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 	self.__thread = threading.Thread(target = self._process_thread)
 	self.__thread.start()
 
+	# this is a hack to get other bots to add this one to their "seen" lists
+	self.conn.send(xmpp.Presence(to=username))
+
     def stop_serving(self):
 	self.__running = False
 	self.__thread.join()
@@ -166,7 +169,11 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         
     @botcmd
     def pushed(self, mess, args):
-	print 'Received pushed command over Jabber channel with args %s (whole message %s)' % (args, mess)
+	print 'Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom())
+	if mess.getFrom() == str(self.jid) + '/' + self.res:
+	    print 'Ignoring own pushed message looped back by server'
+	else:
+	    print 'TRYING TO PULL FROM %s' % args
 
 
 class FileChangeHandler(pyinotify.ProcessEvent):
@@ -326,10 +333,11 @@ if __name__ == '__main__':
     username = config.get('jabber', 'username')
     password = config.get('jabber', 'password')
     alsonotify = config.get('jabber', 'alsonotify')
+    res = 'AutosyncJabberBot on %s' % os.uname()[1]
     try:
-	bot = AutosyncJabberBot(username, password, res='AutosyncJabberBot on %s' % os.uname()[1], debug=False)
+	bot = AutosyncJabberBot(username, password, res=res, debug=False)
 	bot.start_serving()
-	bot.send(username, 'Logged into jabber account')
+	bot.send(username, 'login %s' % res)
 	bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
 	printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
     except Exception as inst:
