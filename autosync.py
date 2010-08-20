@@ -169,7 +169,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
         self.cwd = cwd
         self.ignored = ignored
-        self.timer = ResettableTimer(readfrequency, self.real_push, 1)
+        self.timer = None
         
     def exec_cmd(self, commands):
 	for command in commands.split('\n'):
@@ -185,14 +185,19 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             return
 
 	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
+	print 'Committing changes in ' + curpath + " : " + action
 	self.exec_cmd(action)
 	self.exec_cmd(cmd_commit)
 	# reset the timer and start in case it is not yet running (start should be idempotent if it already is)
 	# this has the effect that, when another change is committed within the timer period (readfrequency seconds),
 	# then these changes will be pushed in one go
-	print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
-	self.timer.reset()
-	self.timer.start()
+	if self.timer and self.timer.is_alive():
+	    print 'Resetting already active timer to new timeout of %s seconds until push would occur' % readfrequency
+	    self.timer.reset()
+	else:
+	    print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
+	    self.timer = ResettableTimer(readfrequency, self.real_push, 1)
+	    self.timer.start()
 
     def process_IN_DELETE(self, event):
 	self._run_cmd(event, cmd_rm % event.pathname)
