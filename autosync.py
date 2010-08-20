@@ -151,6 +151,8 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 	self.__thread.start()
 
 	# this is a hack to get other bots to add this one to their "seen" lists
+	# TODO: still doesn't work, figure out how to use JabberBot to get rid of
+	# 'AutosyncJabberBot : Ignoring message from unseen guest: rene-sync@doc.to/AutosyncJabberBot on iss'
 	self.conn.send(xmpp.Presence(to=username))
 
     def stop_serving(self):
