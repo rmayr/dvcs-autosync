@@ -226,6 +226,13 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	printmsg('Pushing changes', 'Pushing last local changes to remote repository')
 	print 'Pushing last local changes to remote repository'
 	self.exec_cmd(cmd_push)
+	
+	# and try to notify other instances
+	if bot:
+	    proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE)
+	    (remoteurl, errors) = proc.communicate()
+	    bot.send(username, 'PUSHED TO %s' % remoteurl)
+	    bot.send(alsonotify, 'PUSHED TO %s' % remoteurl)
 
 
 def signal_handler(signal, frame):
@@ -266,6 +273,7 @@ if __name__ == '__main__':
     cmd_rm = config.get('dcvs', 'rmcmd')
     cmd_modify = config.get('dcvs', 'modifycmd')
     cmd_move = config.get('dcvs', 'movecmd')
+    cmd_remoteurl = config.get('dcvs', 'remoteurlcmd')
     
     # TODO: this is currently git-specific, should be configurable
     ignorefile = os.path.join(path, '.gitignore')
