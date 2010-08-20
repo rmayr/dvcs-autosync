@@ -194,10 +194,12 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	if self.timer and self.timer.is_alive():
 	    print 'Resetting already active timer to new timeout of %s seconds until push would occur' % readfrequency
 	    self.timer.reset()
+	    print 'Reset timer'
 	else:
 	    print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
-	    self.timer = ResettableTimer(readfrequency, self.real_push, 1)
+	    self.timer = ResettableTimer(maxtime=readfrequency, expire=self.real_push, inc=1, update=self.timer_tick)
 	    self.timer.start()
+	    print 'Started new timer'
 
     def process_IN_DELETE(self, event):
 	self._run_cmd(event, cmd_rm % event.pathname)
@@ -218,6 +220,9 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	else:
 	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
 	    self._run_cmd(event, cmd_add % event.pathname)
+	    
+    def timer_tick(self, counter):
+	print 'Tick %d / %d' % (counter, self.timer.maxtime)
 	    
     def real_push(self):
 	print 'Would now really push to the remote'
@@ -354,6 +359,8 @@ if __name__ == '__main__':
     print 'Committing and pushing local changes now: ' + cmd_commit + ' and ' + cmd_push
     handler.exec_cmd(cmd_commit)
     handler.exec_cmd(cmd_push)
+    
+    print '----------------------------------------------------------------'
 
     while True:
 	time.sleep(10)
