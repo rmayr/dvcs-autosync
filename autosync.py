@@ -55,82 +55,7 @@ def printmsg(title, msg):
 	print title + ': ' + msg
 
 
-class AutosyncJabberBot(jabberbot.JabberBot):
-    def _process_thread(self):
-	print 'Background Jabber bot thread starting'
-	while self.__running:
-	    self.conn.Process(1)
-	    self.idle_proc()
-
-    def start_serving(self):
-	self.connect()
-        if self.conn:
-            self.log('bot connected. serving forever.')
-        else:
-            self.log('could not connect to server - aborting.')
-            return
-
-	self.__running = True
-	self.__thread = threading.Thread(target = self._process_thread)
-	self.__thread.start()
-
-    def stop_serving(self):
-	self.__running = False
-	self.__thread.join()
-  
-    @botcmd
-    def whoami( self, mess, args):
-        """Tells you your username"""
-        return mess.getFrom()
-
-    @botcmd
-    def ping( self, mess, args):
-	print 'Received ping command over Jabber channel'
-        return 'pong'
-
-
-class FileChangeHandler(pyinotify.ProcessEvent):
-    def my_init(self, cwd, ignored):
-        self.cwd = cwd
-        self.ignored = ignored
-        
-    def exec_cmd(self, commands):
-	for command in commands.split('\n'):
-	    subprocess.call(command.split(' '), cwd=self.cwd)
-
-    def _run_cmd(self, event, action):
-	curpath = event.pathname
-	if event.dir:
-	    print 'Ignoring change to directory ' + curpath
-	    return
-        if any(fnmatch.fnmatch(curpath, pattern) for pattern in self.ignored):
-	    print 'Ignoring change to file %s because it matches the ignored patterns from .gitignore' % curpath
-            return
-
-	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
-	self.exec_cmd(action)
-	self.exec_cmd(cmd_commit)
-
-    def process_IN_DELETE(self, event):
-	self._run_cmd(event, cmd_rm % event.pathname)
-
-    def process_IN_CREATE(self, event):
-        self._run_cmd(event, cmd_add % event.pathname)
-
-    def process_IN_MODIFY(self, event):
-        self._run_cmd(event, cmd_modify % event.pathname)
-
-    def process_IN_ATTRIB(self, event):
-        self._run_cmd(event, cmd_modify % event.pathname)
-
-    def process_IN_MOVED_TO(self, event):
-	if event.src_pathname:
-	    print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
-	    self._run_cmd(event, cmd_move % (event.src_pathname, event.pathname))
-	else:
-	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
-	    self._run_cmd(event, cmd_add % event.pathname)
-
+# this helper class has been shamelessly copied from http://socialwire.ca/2010/01/python-resettable-timer-example/
 class ResettableTimer(threading.Thread):
   """
   The ResettableTimer class is a timer whose counting loop can be reset
@@ -205,30 +130,93 @@ class ResettableTimer(threading.Thread):
         self.active = False
         self.expire()
 
-class Relay:
-  def __init__(self, id):
-    self.id = id
 
-    print '** Starting ' + str(id) + ' ON for ' + str(TIMER_ON_TIME) + ' seconds'
+class AutosyncJabberBot(jabberbot.JabberBot):
+    def _process_thread(self):
+	print 'Background Jabber bot thread starting'
+	while self.__running:
+	    self.conn.Process(1)
+	    self.idle_proc()
 
-    self.timer = ResettableTimer(TIMER_ON_TIME, self.process_event)
-    self.timer.start()
+    def start_serving(self):
+	self.connect()
+        if self.conn:
+            self.log('bot connected. serving forever.')
+        else:
+            self.log('could not connect to server - aborting.')
+            return
 
-  # handle the relay switching on timer event
-  def process_event(self):
+	self.__running = True
+	self.__thread = threading.Thread(target = self._process_thread)
+	self.__thread.start()
 
-    # execute some logic
-    # ...
-    # ...
+    def stop_serving(self):
+	self.__running = False
+	self.__thread.join()
+  
+    @botcmd
+    def whoami( self, mess, args):
+        """Tells you your username"""
+        return mess.getFrom()
 
-    print 'Inside event for Relay: ', str(self.id)
+    @botcmd
+    def ping( self, mess, args):
+	print 'Received ping command over Jabber channel'
+        return 'pong'
 
-    # reset the timer
-    self.timer.maxtime = TIMER_ON_TIME
 
-    # restart the timer
-    print '@ Restarting timer: ', str(self.id)
-    self.timer.reset()
+class FileChangeHandler(pyinotify.ProcessEvent):
+    def my_init(self, cwd, ignored):
+        self.cwd = cwd
+        self.ignored = ignored
+        self.timer = ResettableTimer(readfrequency, self.real_push, 1)
+        
+    def exec_cmd(self, commands):
+	for command in commands.split('\n'):
+	    subprocess.call(command.split(' '), cwd=self.cwd)
+
+    def _run_cmd(self, event, action):
+	curpath = event.pathname
+	if event.dir:
+	    print 'Ignoring change to directory ' + curpath
+	    return
+        if any(fnmatch.fnmatch(curpath, pattern) for pattern in self.ignored):
+	    print 'Ignoring change to file %s because it matches the ignored patterns from .gitignore' % curpath
+            return
+
+	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
+	self.exec_cmd(action)
+	self.exec_cmd(cmd_commit)
+	# reset the timer and start in case it is not yet running (start should be idempotent if it already is)
+	# this has the effect that, when another change is committed within the timer period (readfrequency seconds),
+	# then these changes will be pushed in one go
+	print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
+	self.timer.reset()
+	self.timer.start()
+
+    def process_IN_DELETE(self, event):
+	self._run_cmd(event, cmd_rm % event.pathname)
+
+    def process_IN_CREATE(self, event):
+        self._run_cmd(event, cmd_add % event.pathname)
+
+    def process_IN_MODIFY(self, event):
+        self._run_cmd(event, cmd_modify % event.pathname)
+
+    def process_IN_ATTRIB(self, event):
+        self._run_cmd(event, cmd_modify % event.pathname)
+
+    def process_IN_MOVED_TO(self, event):
+	if event.src_pathname:
+	    print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
+	    self._run_cmd(event, cmd_move % (event.src_pathname, event.pathname))
+	else:
+	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
+	    self._run_cmd(event, cmd_add % event.pathname)
+	    
+    def real_push(self):
+	print 'Would now really push to the remote'
+	#self.exec_cmd(cmd_push)
 
 
 def signal_handler(signal, frame):
