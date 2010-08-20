@@ -256,7 +256,7 @@ if __name__ == '__main__':
     
     pidfile = config.get('autosync', 'pidfile')
     ignorepaths = config.get('autosync', 'ignorepath')
-    readfrequency = config.get('autosync', 'readfrequency')
+    readfrequency = int(config.get('autosync', 'readfrequency'))
     
     # Read required DCVS commands
     cmd_startup = config.get('dcvs', 'startupcmd')
