@@ -332,12 +332,12 @@ if __name__ == '__main__':
     except:
 	print 'pynotify does not seem to be installed'
 	
-    username = config.get('jabber', 'username')
-    password = config.get('jabber', 'password')
-    alsonotify = config.get('jabber', 'alsonotify')
+    username = config.get('xmpp', 'username')
+    password = config.get('xmpp', 'password')
+    alsonotify = config.get('xmpp', 'alsonotify')
     res = 'AutosyncJabberBot on %s' % os.uname()[1]
     try:
-	bot = AutosyncJabberBot(username, password, res=res, debug=False)
+	bot = AutosyncJabberBot(username, password, res=res, debug=False, ignoreownmsg=False)
 	bot.start_serving()
 	bot.send(username, 'login %s' % res)
 	bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)

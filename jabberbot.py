@@ -56,7 +56,7 @@ class JabberBot(object):
     MSG_AUTHORIZE_ME = 'Hey there. You are not yet on my roster. Authorize my request and I will do the same.'
     MSG_NOT_AUTHORIZED = 'You did not authorize my subscription request. Access denied.'
 
-    def __init__(self, username, password, res=None, debug=False):
+    def __init__(self, username, password, res=None, debug=False, ignoreownmsg=True):
         """Initializes the jabber bot and sets up commands."""
         self.__debug = debug
         self.__username = username
@@ -64,6 +64,7 @@ class JabberBot(object):
         self.jid = xmpp.JID(self.__username)
         self.res = (res or self.__class__.__name__)
         self.conn = None
+        self. ignoreownmsg = ignoreownmsg
         self.__finished = False
         self.__show = None
         self.__status = None
@@ -230,7 +231,7 @@ class JabberBot(object):
 
 	print 'callback_presence called with jid=%s, status=%s' % (jid, status)
 
-        if self.jid.bareMatch(jid):
+        if self.jid.bareMatch(jid) and self.ignoreownmsg:
 	    print 'ignoring own presence message'
             # Ignore our own presence messages
             return
