@@ -176,6 +176,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 	    print 'Ignoring own pushed message looped back by server'
 	else:
 	    print 'TRYING TO PULL FROM %s' % args
+	    handler.exec_cmd(cmd_pull)
 
 
 class FileChangeHandler(pyinotify.ProcessEvent):
@@ -379,7 +380,7 @@ if __name__ == '__main__':
     handler.exec_cmd(cmd_startup)
     print 'Committing and pushing local changes now: ' + cmd_commit + ' and ' + cmd_push
     handler.exec_cmd(cmd_commit)
-    handler.exec_cmd(cmd_push)
+    handler.real_push()
     
     print '----------------------------------------------------------------'
 
