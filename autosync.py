@@ -35,7 +35,9 @@
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
+from __future__ import with_statement
 import sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, jabberbot, xmpp
+
 botcmd = jabberbot.botcmd
 
 # some global variables, will be initialized in main
@@ -176,7 +178,8 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 	    print 'Ignoring own pushed message looped back by server'
 	else:
 	    print 'TRYING TO PULL FROM %s' % args
-	    handler.exec_cmd(cmd_pull)
+	    with lock:
+		handler.exec_cmd(cmd_pull)
 
 
 class FileChangeHandler(pyinotify.ProcessEvent):
@@ -200,8 +203,11 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 
 	printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
 	print 'Committing changes in ' + curpath + " : " + action
-	self.exec_cmd(action)
-	self.exec_cmd(cmd_commit)
+	
+	with lock:
+	    self.exec_cmd(action)
+	    self.exec_cmd(cmd_commit)
+	    
 	# reset the timer and start in case it is not yet running (start should be idempotent if it already is)
 	# this has the effect that, when another change is committed within the timer period (readfrequency seconds),
 	# then these changes will be pushed in one go
@@ -239,7 +245,8 @@ class FileChangeHandler(pyinotify.ProcessEvent):
     def real_push(self):
 	printmsg('Pushing changes', 'Pushing last local changes to remote repository')
 	print 'Pushing last local changes to remote repository'
-	self.exec_cmd(cmd_push)
+	with lock:
+	    self.exec_cmd(cmd_push)
 	
 	# and try to notify other instances
 	if bot:
@@ -368,19 +375,23 @@ if __name__ == '__main__':
 	print err, err.wmd
 
     printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
+    
+    # this is a central lock for guarding repository operations
+    lock = threading.RLock()
 
     print '==> Start monitoring %s (type c^c to exit)' % path
     # TODO: daemonize
     # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
     notifier.start()
 
-    print 'Fetching updates from remote now: ' + cmd_pull
-    handler.exec_cmd(cmd_pull)
-    print 'Running startup command to check for local changes now: ' + cmd_startup
-    handler.exec_cmd(cmd_startup)
-    print 'Committing and pushing local changes now: ' + cmd_commit + ' and ' + cmd_push
-    handler.exec_cmd(cmd_commit)
-    handler.real_push()
+    with lock:
+	print 'Fetching updates from remote now: ' + cmd_pull
+	handler.exec_cmd(cmd_pull)
+	print 'Running startup command to check for local changes now: ' + cmd_startup
+	handler.exec_cmd(cmd_startup)
+	print 'Committing and pushing local changes now: ' + cmd_commit + ' and ' + cmd_push
+	handler.exec_cmd(cmd_commit)
+	handler.real_push()
     
     print '----------------------------------------------------------------'
 
