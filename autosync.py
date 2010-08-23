@@ -246,6 +246,8 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	printmsg('Pushing changes', 'Pushing last local changes to remote repository')
 	print 'Pushing last local changes to remote repository'
 	with lock:
+	    # this pull should not be necessary if we could rule out race conditions - but we can't, so this is the easiest and quickest way
+	    self.exec_cmd(cmd_pull)
 	    self.exec_cmd(cmd_push)
 	
 	# and try to notify other instances
