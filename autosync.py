@@ -137,8 +137,12 @@ class AutosyncJabberBot(jabberbot.JabberBot):
     def _process_thread(self):
 	print 'Background Jabber bot thread starting'
 	while self.__running:
-	    self.conn.Process(1)
-	    self.idle_proc()
+	    try:
+		self.conn.Process(1)
+		self.idle_proc()
+	    except IOError:
+		print 'Received IOError while trying to handle incoming messages, trying to reconnect now'
+		self.connect()
 
     def start_serving(self):
 	self.connect()
@@ -160,6 +164,15 @@ class AutosyncJabberBot(jabberbot.JabberBot):
     def stop_serving(self):
 	self.__running = False
 	self.__thread.join()
+	
+    # override the send method so that connection errors can be handled by trying to reconnect
+    def send(self, user, text, in_reply_to=None, message_type='chat'):
+	try:
+	    jabberbot.JabberBot.send(self, user, text, in_reply_to, message_type)
+	except IOError:
+	    print 'Received IOError while trying to send message, trying to reconnect now'
+	    self.stop_serving()
+	    self.start_serving()
   
     @botcmd
     def whoami(self, mess, args):
@@ -232,10 +245,15 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         self._run_cmd(event, cmd_modify % event.pathname)
 
     def process_IN_MOVED_TO(self, event):
-	if event.src_pathname:
-	    print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
-	    self._run_cmd(event, cmd_move % (event.src_pathname, event.pathname))
-	else:
+	try:
+	    if event.src_pathname:
+		print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
+		self._run_cmd(event, cmd_move % (event.src_pathname, event.pathname))
+	    else:
+		print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
+		self._run_cmd(event, cmd_add % event.pathname)
+	except AttributeError:
+	    # we don't even have the attribute in the event, so also add
 	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
 	    self._run_cmd(event, cmd_add % event.pathname)
 	    
