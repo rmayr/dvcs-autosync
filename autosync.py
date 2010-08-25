@@ -205,9 +205,9 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	for command in commands.split('\n'):
 	    subprocess.call(command.split(' '), cwd=self.cwd)
 
-    def _run_cmd(self, event, action):
+    def _run_cmd(self, event, action, act_on_dirs=False):
 	curpath = event.pathname
-	if event.dir:
+	if event.dir and not act_on_dirs:
 	    print 'Ignoring change to directory ' + curpath
 	    return
         if any(fnmatch.fnmatch(curpath, pattern) for pattern in self.ignored):
@@ -248,14 +248,14 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	try:
 	    if event.src_pathname:
 		print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
-		self._run_cmd(event, cmd_move % (event.src_pathname, event.pathname))
+		self._run_cmd(event, cmd_move % (event.src_pathname, event.pathname), act_on_dirs=True)
 	    else:
 		print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
-		self._run_cmd(event, cmd_add % event.pathname)
+		self._run_cmd(event, cmd_add % event.pathname, act_on_dirs=True)
 	except AttributeError:
 	    # we don't even have the attribute in the event, so also add
 	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
-	    self._run_cmd(event, cmd_add % event.pathname)
+	    self._run_cmd(event, cmd_add % event.pathname, act_on_dirs=True)
 	    
     def timer_tick(self, counter):
 	print 'Tick %d / %d' % (counter, self.timer.maxtime)
