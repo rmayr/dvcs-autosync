@@ -381,8 +381,8 @@ if __name__ == '__main__':
     wm = pyinotify.WatchManager()
     handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
     # TODO: frequency doesn't work....
-    #notifier = pyinotify.ThreadedNotifier(wm, handler, read_freq=readfrequency)
-    notifier = pyinotify.ThreadedNotifier(wm, handler)
+    notifier = pyinotify.ThreadedNotifier(wm, handler, read_freq=readfrequency)
+    #notifier = pyinotify.ThreadedNotifier(wm, handler)
     # coalescing events needs pyinotify >= 0.9, so make this optional
     try:
 	notifier.coalesce_events()
