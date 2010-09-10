@@ -241,6 +241,9 @@ class FileChangeHandler(pyinotify.ProcessEvent):
     def process_IN_MODIFY(self, event):
         self._run_cmd(event, cmd_modify % event.pathname)
 
+    def process_IN_CLOSE_WRITE(self, event):
+        self._run_cmd(event, cmd_modify % event.pathname)
+
     def process_IN_ATTRIB(self, event):
         self._run_cmd(event, cmd_modify % event.pathname)
 
@@ -385,7 +388,7 @@ if __name__ == '__main__':
 	notifier.coalesce_events()
     except AttributeError as inst:
 	print 'Can not coalesce events, pyinotify does not seem to support it (maybe to old): %s' % inst
-    mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_MODIFY | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
+    mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
     try:
 	print 'Adding recursive, auto-adding watch for path %s with event mask %d' % (path, mask)
 	wd = wm.add_watch(path, mask, rec=True, auto_add=True, quiet=False, exclude_filter=excl)
