@@ -35,6 +35,14 @@
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
+# ============================================================================
+# Copyright Rene Mayrhofer, 2010-
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 2 of the License.
+# ============================================================================
+
 from __future__ import with_statement
 import sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, jabberbot, xmpp
 
@@ -192,21 +200,45 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 	else:
 	    print 'TRYING TO PULL FROM %s' % args
 	    with lock:
-		handler.exec_cmd(cmd_pull)
-
+		handler.protected_pull()
 
 class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
         self.cwd = cwd
         self.ignored = ignored
         self.timer = None
+        self.ignore_events = False
         
-    def exec_cmd(self, commands):
+    def _exec_cmd(self, commands):
 	for command in commands.split('\n'):
 	    subprocess.call(command.split(' '), cwd=self.cwd)
 
-    def _run_cmd(self, event, action, act_on_dirs=False):
+    def _post_action_steps(self):
+	with lock:
+	    # the status command should return 0 when nothing has changed
+	    retcode = subprocess.call(cmd_status, cwd=self.cwd, shell=True)
+	    if retcode != 0:
+		self._exec_cmd(cmd_commit)
+	  
+	if retcode != 0:
+	    # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
+	    # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
+	    # then these changes will be pushed in one go
+	    if self.timer and self.timer.is_alive():
+		print 'Resetting already active timer to new timeout of %s seconds until push would occur' % readfrequency
+		self.timer.reset()
+	    else:
+		print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
+		self.timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
+		self.timer.start()
+	else:
+	    print 'Git reported that there is nothing to commit, not touching commit timer'
+
+    def _handle_action(self, event, action, act_on_dirs=False):
 	curpath = event.pathname
+	if self.ignore_events:
+	    print 'Ignoring event %s to %s, it is most probably caused by a remote change being currently pulled' % (event.maskname, event.pathname)
+	    return
 	if event.dir and not act_on_dirs:
 	    print 'Ignoring change to directory ' + curpath
 	    return
@@ -218,65 +250,53 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	print 'Committing changes in ' + curpath + " : " + action
 	
 	with lock:
-	    self.exec_cmd(action)
-	    # ATTENTION: THIS IS CURRENTLY git-specific!
-	    # git status returns 1 when there is nothing to commit, 0 when something can be commited
-	    retcode = self.exec_cmd(cmd_status)
-	    if retcode == 0:
-		self.exec_cmd(cmd_commit)
-	  
-	if retcode == 0:
-	    # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
-	    # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
-	    # then these changes will be pushed in one go
-	    if self.timer and self.timer.is_alive():
-		print 'Resetting already active timer to new timeout of %s seconds until push would occur' % readfrequency
-		self.timer.reset()
-	    else:
-		print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
-		self.timer = ResettableTimer(maxtime=readfrequency, expire=self.real_push, inc=1, update=self.timer_tick)
-		self.timer.start()
-	else:
-	    print 'Git reported that there is nothing to commit, not touching commit timer'
+	    self._exec_cmd(action)
+	    self._post_action_steps()
 
     def process_IN_DELETE(self, event):
-	self._run_cmd(event, cmd_rm % event.pathname)
+	self._handle_action(event, cmd_rm % event.pathname)
 
     def process_IN_CREATE(self, event):
-        self._run_cmd(event, cmd_add % event.pathname)
+        self._handle_action(event, cmd_add % event.pathname)
 
     def process_IN_MODIFY(self, event):
-        self._run_cmd(event, cmd_modify % event.pathname)
+        self._handle_action(event, cmd_modify % event.pathname)
 
     def process_IN_CLOSE_WRITE(self, event):
-        self._run_cmd(event, cmd_modify % event.pathname)
+        self._handle_action(event, cmd_modify % event.pathname)
 
     def process_IN_ATTRIB(self, event):
-        self._run_cmd(event, cmd_modify % event.pathname)
+        self._handle_action(event, cmd_modify % event.pathname)
 
     def process_IN_MOVED_TO(self, event):
 	try:
 	    if event.src_pathname:
 		print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
-		self._run_cmd(event, cmd_move % (event.src_pathname, event.pathname), act_on_dirs=True)
+		self._handle_action(event, cmd_move % (event.src_pathname, event.pathname), act_on_dirs=True)
 	    else:
 		print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
-		self._run_cmd(event, cmd_add % event.pathname, act_on_dirs=True)
+		self._handle_action(event, cmd_add % event.pathname, act_on_dirs=True)
 	except AttributeError:
 	    # we don't even have the attribute in the event, so also add
 	    print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
-	    self._run_cmd(event, cmd_add % event.pathname, act_on_dirs=True)
+	    self._handle_action(event, cmd_add % event.pathname, act_on_dirs=True)
 	    
     def timer_tick(self, counter):
 	print 'Tick %d / %d' % (counter, self.timer.maxtime)
+	
+    def startup(self):
+	with lock:
+	    print 'Running startup command to check for local changes now: ' + cmd_startup
+	    self._exec_cmd(cmd_startup)
+	    self._post_action_steps()
 	    
-    def real_push(self):
+    def _real_push(self):
 	printmsg('Pushing changes', 'Pushing last local changes to remote repository')
 	print 'Pushing last local changes to remote repository'
 	with lock:
 	    # this pull should not be necessary if we could rule out race conditions - but we can't, so this is the easiest and quickest way
-	    self.exec_cmd(cmd_pull)
-	    self.exec_cmd(cmd_push)
+	    self.protected_pull()
+	    self._exec_cmd(cmd_push)
 	
 	# and try to notify other instances
 	if bot:
@@ -285,6 +305,28 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	    for sendto in [username, alsonotify]:
 		bot.send(sendto, 'pushed %s' % remoteurl)
 
+    def protected_pull(self):
+	printmsg('Pulling changes', 'Pulling changes from remote repository')
+	print 'Pulling changes from remote repository'
+	# need to handle file change notification while applying remote
+	# changes caused by the pull: either conservative (ignore all
+	# file notifactions while the pull is running) or optimized (replay the
+	# file changes that were seen during the pull after it has finished)
+
+	if conservative_pull_lock:
+	    # conservative strategy: ignore all events from now on
+	    self.ignore_events = True
+	
+	with lock:
+	    handler._exec_cmd(cmd_pull)
+	
+	if conservative_pull_lock:
+	    # pull done, now start handling events again
+	    self.ignore_events = False
+	    # and handle those local changes that might have happened while the
+	    # pull ran and we weren't listening by simply doing the startup 
+	    # sequence again
+	    self.startup()
 
 def signal_handler(signal, frame):
         print 'You pressed Ctrl+C, exiting gracefully!'
@@ -309,13 +351,25 @@ if __name__ == '__main__':
 	print 'Watching path ' + path
     else:
 	print 'Error: path ' + path + ' (expanded from ' + pathstr + ') does not exist'
-	os.exit(1)
+	os.exit(100)
     
     pidfile = config.get('autosync', 'pidfile')
     ignorepaths = config.get('autosync', 'ignorepath')
     readfrequency = int(config.get('autosync', 'readfrequency'))
+    syncmethod = config.get('autosync', 'syncmethod')
+    pulllock = config.get('autosync', 'pulllock')
+    if pulllock == 'conservative':
+	conservative_pull_lock = True
+    elif pulllock == 'optimized':
+	conservative_pull_lock = False
+	print 'Error: optimized pull strategy not fully implemented yet (event replay queue missing)'
+	os.exit(101)
+    else:
+	print 'Error: unknown pull lock strategy %s, please use either conservative or optimized' % pulllock
+	os.exit(100)
     
     # Read required DCVS commands
+    cmd_status = config.get('dcvs', 'statuscmd')
     cmd_startup = config.get('dcvs', 'startupcmd')
     cmd_commit = config.get('dcvs', 'commitcmd')
     cmd_push = config.get('dcvs', 'pushcmd')
@@ -413,15 +467,11 @@ if __name__ == '__main__':
     # TODO: daemonize
     # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
     notifier.start()
-
-    with lock:
-	print 'Fetching updates from remote now: ' + cmd_pull
-	handler.exec_cmd(cmd_pull)
-	print 'Running startup command to check for local changes now: ' + cmd_startup
-	handler.exec_cmd(cmd_startup)
-	print 'Committing and pushing local changes now: ' + cmd_commit + ' and ' + cmd_push
-	handler.exec_cmd(cmd_commit)
-	handler.real_push()
+    print '=== Executing startup synchronizaion'
+    handler.protected_pull()
+    if not conservative_pull_lock:
+	# only need to run the startup command here when not using conservative pull locking - otherwise the protected_pull will already do it
+	handler.startup()
     
     print '----------------------------------------------------------------'
 
