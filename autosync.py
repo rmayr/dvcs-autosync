@@ -31,7 +31,7 @@
 # (e.g. 500000).
 #
 # Dependencies:
-#   Linux, Python 2.6, Pyinotify, JabberBot (>= 0.9)
+#   Linux, Python 2.6, Pyinotify (better performance with version >= 0.9), JabberBot (>= 0.9)
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
@@ -219,18 +219,25 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	
 	with lock:
 	    self.exec_cmd(action)
-	    self.exec_cmd(cmd_commit)
-	    
-	# reset the timer and start in case it is not yet running (start should be idempotent if it already is)
-	# this has the effect that, when another change is committed within the timer period (readfrequency seconds),
-	# then these changes will be pushed in one go
-	if self.timer and self.timer.is_alive():
-	    print 'Resetting already active timer to new timeout of %s seconds until push would occur' % readfrequency
-	    self.timer.reset()
+	    # ATTENTION: THIS IS CURRENTLY git-specific!
+	    # git status returns 1 when there is nothing to commit, 0 when something can be commited
+	    retcode = self.exec_cmd(cmd_status)
+	    if retcode == 0:
+		self.exec_cmd(cmd_commit)
+	  
+	if retcode == 0:
+	    # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
+	    # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
+	    # then these changes will be pushed in one go
+	    if self.timer and self.timer.is_alive():
+		print 'Resetting already active timer to new timeout of %s seconds until push would occur' % readfrequency
+		self.timer.reset()
+	    else:
+		print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
+		self.timer = ResettableTimer(maxtime=readfrequency, expire=self.real_push, inc=1, update=self.timer_tick)
+		self.timer.start()
 	else:
-	    print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
-	    self.timer = ResettableTimer(maxtime=readfrequency, expire=self.real_push, inc=1, update=self.timer_tick)
-	    self.timer.start()
+	    print 'Git reported that there is nothing to commit, not touching commit timer'
 
     def process_IN_DELETE(self, event):
 	self._run_cmd(event, cmd_rm % event.pathname)
