@@ -44,7 +44,12 @@
 # ============================================================================
 
 from __future__ import with_statement
-import sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, jabberbot, xmpp
+
+import warnings, sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
+    import jabberbot, xmpp
 
 botcmd = jabberbot.botcmd
 
@@ -450,8 +455,10 @@ if __name__ == '__main__':
     alsonotify = config.get('xmpp', 'alsonotify')
     res = 'AutosyncJabberBot on %s' % os.uname()[1]
     try:
-        bot = AutosyncJabberBot(username, password, res=res, debug=False, ignoreownmsg=False)
-        bot.start_serving()
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore",category=DeprecationWarning)
+            bot = AutosyncJabberBot(username, password, res=res, debug=False, ignoreownmsg=False)
+            bot.start_serving()
         bot.send(username, 'login %s' % res)
         bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
         printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
