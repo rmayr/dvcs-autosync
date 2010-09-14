@@ -45,7 +45,7 @@
 
 from __future__ import with_statement
 
-import warnings, sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser
+import warnings, sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, logging
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore",category=DeprecationWarning)
@@ -232,7 +232,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                 j = 0
                 while i < len(cmdarray):
                     if cmdarray[i] == '%s':
-                        print 'Substituting cmd part %s with %s' % (cmdarray[i], parms[j])
+                        logging.debug('Substituting cmd part %s with %s' % (cmdarray[i], parms[j]))
                         cmdarray[i] = parms[j]
                         j=j+1
                     i=i+1 
@@ -307,7 +307,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             self._handle_action(event, cmd_add, [event.pathname], act_on_dirs=True)
 	    
     def timer_tick(self, counter):
-        print 'Tick %d / %d' % (counter, self.timer.maxtime)
+        logging.debug('Tick %d / %d' % (counter, self.timer.maxtime))
 	
     def startup(self):
         with lock:
