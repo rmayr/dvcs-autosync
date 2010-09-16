@@ -1,6 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
+# Version 0.1
+# TODO:
+# * determine if pulling directly from those repositories which caused the changes is quicker then from central
+# * optimize pulls and pushed during startup
+# * implement optimistic pull lock for better performance
+#
 # Usage:
 #   ./autosync.py [config file, default is ~/.autosync]
 #
@@ -62,12 +68,12 @@ bot = None
 
 def printmsg(title, msg):
     if desktopnotifygnome:
-		n = pynotify.Notification(title, msg)
-		n.show()
+        n = pynotify.Notification(title, msg)
+        n.show()
     elif desktopnotifykde:
-		knotify.event('info', 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
+        knotify.event('info', 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
     else:
-		print title + ': ' + msg
+        print title + ': ' + msg
 
 
 # this helper class has been shamelessly copied from http://socialwire.ca/2010/01/python-resettable-timer-example/
@@ -156,6 +162,9 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         self.__running = False
         jabberbot.JabberBot.__init__(self, username, password, res, debug, ignoreownmsg)
 
+    def log( self, s):
+        print 'AutosyncJabberbot:', s
+
     def _process_thread(self):
         print 'Background Jabber bot thread starting'
         while self.__running:
@@ -174,11 +183,11 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             self.log('could not connect to server - aborting.')
             return
 
-	    self.__running = True
+        self.__running = True
         self.__thread = threading.Thread(target=self._process_thread)
         self.__thread.start()
 
-	    # this is a hack to get other bots to add this one to their "seen" lists
+        # this is a hack to get other bots to add this one to their "seen" lists
         # TODO: still doesn't work, figure out how to use JabberBot to get rid of
         # 'AutosyncJabberBot : Ignoring message from unseen guest: rene-sync@doc.to/AutosyncJabberBot on iss'
         self.conn.send(xmpp.Presence(to=username))
@@ -203,7 +212,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
     @botcmd
     def ping(self, mess, args):
-	print 'Received ping command over Jabber channel'
+        print 'Received ping command over Jabber channel'
         return 'pong'
         
     @botcmd
@@ -319,8 +328,12 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         printmsg('Pushing changes', 'Pushing last local changes to remote repository')
         print 'Pushing last local changes to remote repository'
         with lock:
-            # this pull should not be necessary if we could rule out race conditions - but we can't, so this is the easiest and quickest way
-            self.protected_pull()
+            # TODO: check if we actually need a pull or a check-for-pull here 
+            # or if all race conditions were already ruled out
+            # if we need a check-for-pull, then something like 
+            #    git fetch --dry-run | grep "Unpacking objects:
+            # might help
+            #self.protected_pull()
             self._exec_cmd(cmd_push)
 	
         # and try to notify other instances
@@ -328,8 +341,8 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE)
             (remoteurl, errors) = proc.communicate()
             for sendto in [username, alsonotify]:
-		if sendto:
-		    bot.send(sendto, 'pushed %s' % remoteurl)
+                if sendto:
+                    bot.send(sendto, 'pushed %s' % remoteurl)
 
     def protected_pull(self):
         printmsg('Pulling changes', 'Pulling changes from remote repository')
@@ -359,9 +372,9 @@ def signal_handler(signal, frame):
     print 'You pressed Ctrl+C, exiting gracefully!'
     if notifier:
         notifier.stop()
-	if bot:
-	    bot.stop_serving()
-        sys.exit(0)
+    if bot:
+        bot.stop_serving()
+    sys.exit(0)
 
 
 if __name__ == '__main__':
@@ -378,7 +391,7 @@ if __name__ == '__main__':
         print 'Watching path ' + path
     else:
         print 'Error: path ' + path + ' (expanded from ' + pathstr + ') does not exist'
-	os.exit(100)
+        os.exit(100)
     
     pidfile = config.get('autosync', 'pidfile')
     ignorepaths = config.get('autosync', 'ignorepath')
@@ -454,9 +467,9 @@ if __name__ == '__main__':
     username = config.get('xmpp', 'username')
     password = config.get('xmpp', 'password')
     try:
-	alsonotify = config.get('xmpp', 'alsonotify')
+        alsonotify = config.get('xmpp', 'alsonotify')
     except:
-	alsonotify = None
+        alsonotify = None
     res = 'AutosyncJabberBot on %s' % os.uname()[1]
     try:
         with warnings.catch_warnings():
@@ -465,7 +478,7 @@ if __name__ == '__main__':
             bot.start_serving()
         bot.send(username, 'login %s' % res)
         if alsonotify:
-	    bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
+            bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
         printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
     except Exception as inst:
         print type(inst)
@@ -509,5 +522,4 @@ if __name__ == '__main__':
     print '----------------------------------------------------------------'
 
     while True:
-	time.sleep(10)
-
+        time.sleep(10)
