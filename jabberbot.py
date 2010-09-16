@@ -229,10 +229,7 @@ class JabberBot(object):
                 presence.getType(), presence.getShow(), \
                 presence.getStatus()
 
-	print 'callback_presence called with jid=%s, status=%s' % (jid, status)
-
         if self.jid.bareMatch(jid) and self.ignoreownmsg:
-	    print 'ignoring own presence message'
             # Ignore our own presence messages
             return
 
@@ -245,12 +242,9 @@ class JabberBot(object):
             if old_status != status:
                 self.status_message_changed(jid, status)
                 
-            print 'adding (%s, %s) to seen jid %s' % (show, status, jid)
-
             self.__seen[jid] = (show, status)
         elif type_ == self.OFFLINE and jid in self.__seen:
             # Notify of user offline status change
-            print 'removing jid %s from seen ones' % jid
             del self.__seen[jid]
             self.status_type_changed(jid, self.OFFLINE)
 

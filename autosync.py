@@ -67,12 +67,15 @@ notifier = None
 bot = None
 
 def printmsg(title, msg):
-    if desktopnotifygnome:
-        n = pynotify.Notification(title, msg)
-        n.show()
-    elif desktopnotifykde:
-        knotify.event('info', 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
-    else:
+    try:
+        if desktopnotifygnome:
+            n = pynotify.Notification(title, msg)
+            n.show()
+        elif desktopnotifykde:
+            knotify.event('info', 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
+        else:
+            print title + ': ' + msg
+    except:
         print title + ': ' + msg
 
 
@@ -163,7 +166,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         jabberbot.JabberBot.__init__(self, username, password, res, debug, ignoreownmsg)
 
     def log( self, s):
-        print 'AutosyncJabberbot:', s
+        logging.debug('AutosyncJabberbot:' + s)
 
     def _process_thread(self):
         print 'Background Jabber bot thread starting'
