@@ -328,7 +328,8 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE)
             (remoteurl, errors) = proc.communicate()
             for sendto in [username, alsonotify]:
-                bot.send(sendto, 'pushed %s' % remoteurl)
+		if sendto:
+		    bot.send(sendto, 'pushed %s' % remoteurl)
 
     def protected_pull(self):
         printmsg('Pulling changes', 'Pulling changes from remote repository')
@@ -452,7 +453,10 @@ if __name__ == '__main__':
 	
     username = config.get('xmpp', 'username')
     password = config.get('xmpp', 'password')
-    alsonotify = config.get('xmpp', 'alsonotify')
+    try:
+	alsonotify = config.get('xmpp', 'alsonotify')
+    except:
+	alsonotify = None
     res = 'AutosyncJabberBot on %s' % os.uname()[1]
     try:
         with warnings.catch_warnings():
@@ -460,7 +464,8 @@ if __name__ == '__main__':
             bot = AutosyncJabberBot(username, password, res=res, debug=False, ignoreownmsg=False)
             bot.start_serving()
         bot.send(username, 'login %s' % res)
-        bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
+        if alsonotify:
+	    bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
         printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
     except Exception as inst:
         print type(inst)
