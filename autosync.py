@@ -88,7 +88,7 @@ class ResettableTimer(threading.Thread):
     specified. Resettable timer keeps counting until the "run" method
     is explicitly killed with the "kill" method.
     """
-    def __init__(self, maxtime, expire, inc=None, update=None):
+    def __init__(self, maxtime, expire, inc=None, update=None, arg=None):
         """
         @param maxtime: time in seconds before expiration after resetting
                         in seconds
@@ -96,6 +96,7 @@ class ResettableTimer(threading.Thread):
         @param inc: amount by which timer increments before
                     updating in seconds, default is maxtime/2
         @param update: function called when timer updates
+        @param arg: arbitrary argument that will be passed to function expire when timer expires 
         """
         self.maxtime = maxtime
         self.expire = expire
@@ -107,7 +108,8 @@ class ResettableTimer(threading.Thread):
             self.update = update
         else:
             self.update = lambda c : None
-            
+
+        self.arg = arg
         self.counter = 0
         self.active = True
         self.stop = False
@@ -157,7 +159,7 @@ class ResettableTimer(threading.Thread):
                     self.update(self.counter)
             if self.active:
                 self.active = False
-                self.expire()
+                self.expire(arg)
 
 
 class AutosyncJabberBot(jabberbot.JabberBot):
@@ -233,15 +235,16 @@ class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
         self.cwd = cwd
         self.ignored = ignored
-        # Timer for delayed execution of push 
-        self._timer = None
+        # singleton timer for delayed execution of push 
+        self._push_timer = None
         # When set to true, then all events will be ignored.
         # This is used to temporarily disable file event handling when a local
         # pull operation is active.
         self._ignore_events = False
         # This is a dictionary of all events that occurred within _coalesce_time seconds.
-        # Elements in the sets are FIFO lists of event types which were delivered
-        # for the respective file path, indexed by the respective file path.
+        # Elements in the sets are tuples of FIFO lists of event types which were delivered
+        # for the respective file path and timers for handling the file, indexed by the 
+        # respective file path.
         self._file_events = {}
         
     def _exec_cmd(self, commands, parms = None):
@@ -269,17 +272,17 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
             # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
             # then these changes will be pushed in one go
-            if self._timer and self._timer.is_alive():
-                print 'Resetting already active timer to new timeout of %s seconds until push would occur' % readfrequency
-                self._timer.reset()
+            if self._push_timer and self._push_timer.is_alive():
+                print 'Resetting already active push timer to new timeout of %s seconds until push would occur' % readfrequency
+                self._push_timer.reset()
             else:
                 print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
-                self._timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
-                self._timer.start()
+                self._push_timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
+                self._push_timer.start()
         else:
             print 'Git reported that there is nothing to commit, not touching commit timer'
 
-    def _handle_action(self, event, action, parms, act_on_dirs=False):
+    def _queue_action(self, event, action, parms, act_on_dirs=False):
         curpath = event.pathname
         if self._ignore_events:
             print 'Ignoring event %s to %s, it is most probably caused by a remote change being currently pulled' % (event.maskname, event.pathname)
@@ -295,26 +298,40 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         # this allows e.g. a file that has just been removed and re-created
         # immediately afterwards (as many editors do) to be recorded just as
         # being modified
-        if not self._file_events.has_key(curpath):
-            self._file_events = list()
-        self._file_events[curpath].append((event.maskname, action))
+        with lock:
+            # each entry in the dict is a tuple of the list of events and a timer
+            if not self._file_events.has_key(curpath):
+                self._file_events = (list(), None)
+            # and each entry in the list is a tuple of event name and associated action
+            self._file_events[curpath][0].append((event.maskname, action))
+            if self._file_events[curpath][1] and self._file_events[curpath][1].is_alive():
+                print 'Resetting already active coalesce timer to new timeout of %s seconds until coalescing events for file %s would occur' % (coalesce_seconds, curpath)
+                self._file_events[curpath][1].reset()
+            else:
+                print 'Starting coalesce timer with %s seconds until coalescing events for file %s would occur (if no other changes happen in between)' % (coalesce_seconds, curpath)
+                self._file_events[curpath][1] = ResettableTimer(maxtime=coalesce_seconds, expire=self._filter_and_handle_actions, inc=1, arg=curpath)
+                self._file_events[curpath][1].start()
 
-        # TODO move to coalesce handler function        
-        for file, events in self._file_events.iteritems():
-            print 'Considering file %s, which has the following events recorded:' % file
-            # TODO: need filter heuristic
-            for eventtype, action in events:
-                print '   Event type=%s, action=%s' % (eventtype, action)
-        self._file_events.clear()
 
-        # TODO: this needs to go into a separate function called by a timer after
-        # _coalesce_time seconds
+        # TODO: this needs to go into _filter_and_handle_actions
         printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
         print 'Committing changes in ' + curpath + " : " + action
 	
         with lock:
             self._exec_cmd(action, parms)
             self._post_action_steps()
+            
+    def _filter_and_handle_actions(self, filename):
+        print 'Coalesce event triggered for file ' + filename
+        with lock:
+            print 'Considering file %s, which has the following events recorded:' % filename
+            events, timer = self._file_events[curpath]
+            # TODO: need filter heuristic
+            for eventtype, action in events:
+                print '   Event type=%s, action=%s' % (eventtype, action)
+
+            # and clear again for next events coalescing
+            del self._file_events[curpath]
 
     def process_IN_DELETE(self, event):
         # sanity check - don't remove file if it still exists in the file system!
@@ -322,35 +339,35 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             print 'Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application' % event.pathname
             return
          
-        self._handle_action(event, cmd_rm, [event.pathname])
+        self._queue_action(event, cmd_rm, [event.pathname])
 
     def process_IN_CREATE(self, event):
-        self._handle_action(event, cmd_add, [event.pathname])
+        self._queue_action(event, cmd_add, [event.pathname])
 
     def process_IN_MODIFY(self, event):
-        self._handle_action(event, cmd_modify, [event.pathname])
+        self._queue_action(event, cmd_modify, [event.pathname])
 
     def process_IN_CLOSE_WRITE(self, event):
-        self._handle_action(event, cmd_modify, [event.pathname])
+        self._queue_action(event, cmd_modify, [event.pathname])
 
     def process_IN_ATTRIB(self, event):
-        self._handle_action(event, cmd_modify, [event.pathname])
+        self._queue_action(event, cmd_modify, [event.pathname])
 
     def process_IN_MOVED_TO(self, event):
         try:
             if event.src_pathname:
                 print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
-                self._handle_action(event, cmd_move, [event.src_pathname, event.pathname], act_on_dirs=True)
+                self._queue_action(event, cmd_move, [event.src_pathname, event.pathname], act_on_dirs=True)
             else:
                 print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
-                self._handle_action(event, cmd_add, [event.pathname], act_on_dirs=True)
+                self._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
         except AttributeError:
             # we don't even have the attribute in the event, so also add
             print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
-            self._handle_action(event, cmd_add, [event.pathname], act_on_dirs=True)
+            self._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
 	    
     def timer_tick(self, counter):
-        logging.debug('Tick %d / %d' % (counter, self._timer.maxtime))
+        logging.debug('Tick %d / %d' % (counter, self._push_timer.maxtime))
 	
     def startup(self):
         with lock:
@@ -358,7 +375,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             self._exec_cmd(cmd_startup)
             self._post_action_steps()
 	    
-    def _real_push(self):
+    def _real_push(self, arg):
         printmsg('Pushing changes', 'Pushing last local changes to remote repository')
         print 'Pushing last local changes to remote repository'
         with lock:
@@ -430,6 +447,7 @@ if __name__ == '__main__':
     pidfile = config.get('autosync', 'pidfile')
     ignorepaths = config.get('autosync', 'ignorepath')
     readfrequency = int(config.get('autosync', 'readfrequency'))
+    coalesce_seconds = 2
     syncmethod = config.get('autosync', 'syncmethod')
     pulllock = config.get('autosync', 'pulllock')
     if pulllock == 'conservative':
