@@ -4,7 +4,7 @@
 # Version 0.1
 # TODO:
 # * determine if pulling directly from those repositories which caused the changes is quicker then from central
-# * optimize pulls and pushed during startup
+# * optimize pulls and pushes during startup
 # * implement optimistic pull lock for better performance
 #
 # Usage:
@@ -233,8 +233,16 @@ class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
         self.cwd = cwd
         self.ignored = ignored
-        self.timer = None
-        self.ignore_events = False
+        # Timer for delayed execution of push 
+        self._timer = None
+        # When set to true, then all events will be ignored.
+        # This is used to temporarily disable file event handling when a local
+        # pull operation is active.
+        self._ignore_events = False
+        # This is a dictionary of all events that occurred within _coalesce_time seconds.
+        # Elements in the sets are FIFO lists of event types which were delivered
+        # for the respective file path, indexed by the respective file path.
+        self._file_events = {}
         
     def _exec_cmd(self, commands, parms = None):
         for command in commands.split('\n'):
@@ -261,19 +269,19 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
             # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
             # then these changes will be pushed in one go
-            if self.timer and self.timer.is_alive():
+            if self._timer and self._timer.is_alive():
                 print 'Resetting already active timer to new timeout of %s seconds until push would occur' % readfrequency
-                self.timer.reset()
+                self._timer.reset()
             else:
                 print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
-                self.timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
-                self.timer.start()
+                self._timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
+                self._timer.start()
         else:
             print 'Git reported that there is nothing to commit, not touching commit timer'
 
     def _handle_action(self, event, action, parms, act_on_dirs=False):
         curpath = event.pathname
-        if self.ignore_events:
+        if self._ignore_events:
             print 'Ignoring event %s to %s, it is most probably caused by a remote change being currently pulled' % (event.maskname, event.pathname)
             return
         if event.dir and not act_on_dirs:
@@ -283,6 +291,24 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             print 'Ignoring change to file %s because it matches the ignored patterns from .gitignore' % curpath
             return
 
+        # remember the event for this file, but don't act on it immediately
+        # this allows e.g. a file that has just been removed and re-created
+        # immediately afterwards (as many editors do) to be recorded just as
+        # being modified
+        if not self._file_events.has_key(curpath):
+            self._file_events = list()
+        self._file_events[curpath].append((event.maskname, action))
+
+        # TODO move to coalesce handler function        
+        for file, events in self._file_events.iteritems():
+            print 'Considering file %s, which has the following events recorded:' % file
+            # TODO: need filter heuristic
+            for eventtype, action in events:
+                print '   Event type=%s, action=%s' % (eventtype, action)
+        self._file_events.clear()
+
+        # TODO: this needs to go into a separate function called by a timer after
+        # _coalesce_time seconds
         printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
         print 'Committing changes in ' + curpath + " : " + action
 	
@@ -291,6 +317,11 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             self._post_action_steps()
 
     def process_IN_DELETE(self, event):
+        # sanity check - don't remove file if it still exists in the file system!
+        if os.path.exists(event.pathname):
+            print 'Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application' % event.pathname
+            return
+         
         self._handle_action(event, cmd_rm, [event.pathname])
 
     def process_IN_CREATE(self, event):
@@ -319,7 +350,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             self._handle_action(event, cmd_add, [event.pathname], act_on_dirs=True)
 	    
     def timer_tick(self, counter):
-        logging.debug('Tick %d / %d' % (counter, self.timer.maxtime))
+        logging.debug('Tick %d / %d' % (counter, self._timer.maxtime))
 	
     def startup(self):
         with lock:
@@ -357,14 +388,14 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 
         if conservative_pull_lock:
             # conservative strategy: ignore all events from now on
-            self.ignore_events = True
+            self._ignore_events = True
 	
         with lock:
             handler._exec_cmd(cmd_pull)
 	
         if conservative_pull_lock:
             # pull done, now start handling events again
-            self.ignore_events = False
+            self._ignore_events = False
             # and handle those local changes that might have happened while the
             # pull ran and we weren't listening by simply doing the startup 
             # sequence again
