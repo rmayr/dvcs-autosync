@@ -3,6 +3,8 @@
 #
 # Version 0.2
 # TODO:
+# * filter events so that a rm/add does not lead to a git rm in between
+# * find out why the Jabber msg-to-self doesn't work in some cases
 # * determine if pulling directly from those repositories which caused the changes is quicker then from central
 # * optimize pulls and pushes during startup
 # * implement optimistic pull lock for better performance
@@ -159,7 +161,7 @@ class ResettableTimer(threading.Thread):
                     self.update(self.counter)
             if self.active:
                 self.active = False
-                self.expire(arg)
+                self.expire(self.arg)
 
 
 class AutosyncJabberBot(jabberbot.JabberBot):
@@ -245,7 +247,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         # Elements in the sets are tuples of FIFO lists of event types which were delivered
         # for the respective file path and timers for handling the file, indexed by the 
         # respective file path.
-        self._file_events = {}
+        self._file_events = dict()
         
     def _exec_cmd(self, commands, parms = None):
         for command in commands.split('\n'):
@@ -301,7 +303,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         with lock:
             # each entry in the dict is a tuple of the list of events and a timer
             if not self._file_events.has_key(curpath):
-                self._file_events = (list(), None)
+                self._file_events[curpath] = [list(), None]
             # and each entry in the list is a tuple of event name and associated action
             self._file_events[curpath][0].append((event.maskname, action))
             if self._file_events[curpath][1] and self._file_events[curpath][1].is_alive():
@@ -309,32 +311,56 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                 self._file_events[curpath][1].reset()
             else:
                 print 'Starting coalesce timer with %s seconds until coalescing events for file %s would occur (if no other changes happen in between)' % (coalesce_seconds, curpath)
-                self._file_events[curpath][1] = ResettableTimer(maxtime=coalesce_seconds, expire=self._filter_and_handle_actions, inc=1, arg=curpath)
+                self._file_events[curpath][1] = ResettableTimer(maxtime=coalesce_seconds, expire=self._filter_and_handle_actions, inc=1, arg=[curpath, parms])
                 self._file_events[curpath][1].start()
-
-
-        # TODO: this needs to go into _filter_and_handle_actions
-        printmsg('Local change', 'Committing changes in ' + curpath + " : " + action)
-        print 'Committing changes in ' + curpath + " : " + action
-	
-        with lock:
-            self._exec_cmd(action, parms)
-            self._post_action_steps()
             
-    def _filter_and_handle_actions(self, filename):
-        print 'Coalesce event triggered for file ' + filename
+    def _filter_and_handle_actions(self, args):
+        curpath = args[0]
+        parms = args[1]
+            
+        print 'Coalesce event triggered for file ' + curpath
         with lock:
-            print 'Considering file %s, which has the following events recorded:' % filename
+            print 'Considering file %s, which has the following events recorded:' % curpath
             events, timer = self._file_events[curpath]
-            # TODO: need filter heuristic
+            lastevent = None
+            lastaction = None
             for eventtype, action in events:
                 print '   Event type=%s, action=%s' % (eventtype, action)
+                
+                if not lastevent:
+                    lastevent = eventtype
+                    lastaction = action
+                
                 # TODO: here needs to be some code to order events by priority and only process the last one with high priority
+                # prio 1: add
+                # prio 2: move
+                # prio 3: modify
+                # prio 4: rm
+                # special case: rm then add --> modify
+                if lastevent == 'IN_DELETE' and eventtype == 'IN_CREATE':
+                    lastevent = 'IN_MODIFY'
+                    lastaction = cmd_modify
+                    break
+                
+                # priority ordering 
+                if lastevent == 'IN_MODIFY' and eventtype == 'IN_CREATE':
+                    lastevent = eventtype
+                    lastaction = action
+                if lastevent == 'IN_DELETE' and eventtype == 'IN_MODIFY':
+                    lastevent = eventtype
+                    lastaction = action
 
-            # TODO: the call of _exec_cmd and _post_action_steps from above needs to go here
+            print 'Final action for file %s: type=%s, action=%s' % (curpath, lastevent, lastaction)
 
             # and clear again for next events coalescing
             del self._file_events[curpath]
+            
+            printmsg('Local change', 'Committing changes in ' + curpath + " : " + lastaction)
+            print 'Committing changes in ' + curpath + " : " + lastaction
+    
+            self._exec_cmd(lastaction, parms)
+            self._post_action_steps()
+            
 
     def process_IN_DELETE(self, event):
         # sanity check - don't remove file if it still exists in the file system!
@@ -549,7 +575,7 @@ if __name__ == '__main__':
     try:
         notifier.coalesce_events()
     except AttributeError as inst:
-        print 'Can not coalesce events, pyinotify does not seem to support it (maybe to old): %s' % inst
+        print 'Can not coalesce events, pyinotify does not seem to support it (maybe too old): %s' % inst
     mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
     try:
         print 'Adding recursive, auto-adding watch for path %s with event mask %d' % (path, mask)
