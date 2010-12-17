@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Version 0.1
+# Version 0.2
 # TODO:
 # * determine if pulling directly from those repositories which caused the changes is quicker then from central
 # * optimize pulls and pushes during startup
@@ -46,7 +46,7 @@
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
-# the Free Software Foundation; either version 2 of the License.
+# the Free Software Foundation; either version 2 or 3 of the License.
 # ============================================================================
 
 from __future__ import with_statement
@@ -329,6 +329,9 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # TODO: need filter heuristic
             for eventtype, action in events:
                 print '   Event type=%s, action=%s' % (eventtype, action)
+                # TODO: here needs to be some code to order events by priority and only process the last one with high priority
+
+            # TODO: the call of _exec_cmd and _post_action_steps from above needs to go here
 
             # and clear again for next events coalescing
             del self._file_events[curpath]
