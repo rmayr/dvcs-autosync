@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Version 0.2
+# Version 0.3
 # TODO:
-# * filter events so that a rm/add does not lead to a git rm in between
 # * find out why the Jabber msg-to-self doesn't work in some cases
 # * determine if pulling directly from those repositories which caused the changes is quicker then from central
 # * optimize pulls and pushes during startup
@@ -331,7 +330,6 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                     lastevent = eventtype
                     lastaction = action
                 
-                # TODO: here needs to be some code to order events by priority and only process the last one with high priority
                 # prio 1: add
                 # prio 2: move
                 # prio 3: modify
