@@ -7,6 +7,9 @@
 # * determine if pulling directly from those repositories which caused the changes is quicker then from central
 # * optimize pulls and pushes during startup
 # * implement optimistic pull lock for better performance
+# TODO future versions:
+# - automatically add some context to commit messages (e.g. location, applications open at the same time, etc.)
+# - allow to specify a commit/change message via traybar icon/popup message, maybe even in retrospect (rewriting history before pushing with a longer push delay)
 #
 # Usage:
 #   ./autosync.py [config file, default is ~/.autosync]
