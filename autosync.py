@@ -16,14 +16,11 @@
 #
 # Background monitoring |path| and its subdirectories for modifications on
 # files and automatically commits the changes to git. This script assumes
-# that the passed directory is (a subdirectory) of a checkout out git tree.
+# that the configured directory is (a subdirectory) of a checked out git tree.
 # A PID file is written to [pidfile] for killing the daemon later on.
 # Optionally, an [ignores] file is read with one exclusion pattern per line
 # and files matching any of the patterns are ignored. This will typically be
 # the .gitignore file already existing the git tree.
-#
-# Example:
-#   ./autosync.py /my-git-work-tree
 #
 # Note that for Jabber login, there probably needs to be a 
 # _xmpp-client._tcp.<domain name of jabber account> SRV entry in DNS so that 
@@ -46,7 +43,7 @@
 #   Pynotify for desktop notifications
 #
 # ============================================================================
-# Copyright Rene Mayrhofer, 2010-
+# Copyright Rene Mayrhofer, 2010-2011
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
