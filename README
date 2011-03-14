@@ -1,0 +1,46 @@
+What does it do?
+------------------------
+Automatically keep DVCS repositories in sync whenever changes happen by automatically committing and pushing/pulling.
+
+How does it do it?
+------------------------
+0. Set up desktop notifications (for these nice bubble-style popups when anything happens) and log into a Jabber/XMPP account specified in the config file.
+
+1. Monitor a specific path for changes with inotify.
+At the moment, only one path is supported and multiple skript instances have to be run for multiple disjoint paths. This path is assumed to be (part of) a repository. Currently tested with git, but should support most DVCS (the config file allows to specify the DVCS commands called when interacting with it).
+
+2. When changes are detected, check them into the repository that is being monitored (or delete, or move, etc.).
+It automatically ignores any patterns listed in .gitignore and the config file allows to exclude other directories (e.g. repositories within the main repository).
+
+3. Wait for a configurable time. When nothing else changes in between, commit.
+
+4. Wait a few seconds longer (again configurable) and, if nothing else is commited, initiate a push.
+
+5. After the push has finished, send an XMPP message to self (that is, to all clients logged in with the same account) to notify other accounts of the push.
+
+[At any time in between]. When receiving a proper XMPP message, pull from the repository.
+
+
+Thoughts that should be considered at some point but have not yet been implemented:
+------------------------
+- The XMPP push message already contains a parameter, namely the repository the push went to. Add another parameter to specify the repository in which the change happened so that others can try to pull directly from there, in case it is quicker. The main use case for this optimization is my standard one: the laptop sitting next to the desktop and both of them syncing each other's home directories. Going via the main, hosted server is quite a bit more inefficient than pulling via 1GB/s LAN....
+
+- Pulls and pushes can and should be optimized. At the moment, I take a conservative locking approach whenever a conflict may occur and performance is reasonable on my main work tree with ca. 16GB (cloned GIT repo), but not stellar. Specifically, actually implement the "optimized" pull lock strategy already described in the example config file.
+
+- Implement another option for synchronization besides XMPP (idea: a simple broadcast reflector on a single TCP port that could even run on e.g. OpenWRT, or re-use whatever the Sparkleshare server does).
+
+- Automatically adding some context to each commit message besides the automatic date/time would be useful for finding out why a change happened. Nepomuk anybody (just kidding, maybe, for now...)?
+
+- Allow to specify commit messages via popups. When ignored, use default commit message.
+
+Installation
+------------------------
+Simple. Copy the attached .autosync-example config file to ~/.autosync, change to your needs (paths including ignores and XMPP id/password), then run the autosync.py script. Note that it currently needs a slightly extended version of jabberbot.py (e.g. in the same directory from which autosync.py is executed) to allow reception of messages from its own XMPP Id. I would like to push these minimal changes upstream, but haven't done that so far.
+
+Disclaimer
+------------------------
+This is my first Python program that is longer than 100 lines. Please be easy on me with the patches, complaints and "what did you think, doing it this way?" messages. I have tried to comment wherever I found it necessary for my own understanding, but this is neither the best structured nor the most elegant program I ever wrote. Any hints for improving it are greatly welcome, and interoperability patches to work with Sparkleshare even more so. In the future, the two projects should definitely interoperate, which will come done to implementing each other's notification mechanism. My autosync Python script could then be used wherever headless operation might be required and/or Mono is not installed.
+I have tested it between three systems and, in this version, it works reasonably well. However, there does seem to be the occasional kink when editors go crazy on temporary file creation, renaming, deleting originals, etc. These might be races, but I don't know for certain yet. Additional test cases are more then welcome. This script should be fairly safe to try, considering that the worst it will do is add a few hundred commits to your DVCS repo and push them to the configured default remote. But, after all, what is the point in using a DVCS if you can't roll back any changes made by you or a buggy script (yes, I did have to do that a number of times while developing the manual inotify event coalescing to cooperate better with git add/remove/mv actions).
+
+
+Rene Mayrhofer <rene@mayrhofer.eu.org>
