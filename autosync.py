@@ -513,7 +513,7 @@ if __name__ == '__main__':
         ignorefilepatterns = [pat.strip() for pat in f.readlines()]
         f.close()
     else:
-        ignoefilepatterns = []
+        ignorefilepatterns = []
     # (unfortunately, can't use pyinotify.ExcludeFilter, because this expects regexes (which .gitignore doesn't support))
     print 'Ignoring files matching any of the patterns ' + ' '.join(ignorefilepatterns)
 
