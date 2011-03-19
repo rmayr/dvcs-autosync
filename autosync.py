@@ -23,18 +23,28 @@
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
-import sys
-import os
-import functools
-import threading
+import sys, os, functools, threading
 #import subprocess
 import pyinotify
-#from jabberbot import JabberBot, botcmd
+import jabberbot
+#botcmd = jabberbot.botcmd
 
 # some global variables, will be initialized in main
-desktopnotify = False
+desktopnotifykde = False
+desktopnotifygnome = False
+knotify = None
 
-#class SystemInfoJabberBot(JabberBot):
+def printmsg(title, msg):
+    if desktopnotifygnome:
+	n = pynotify.Notification(title, msg)
+	n.show()
+    elif desktopnotifykde:
+	knotify.event('info', 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
+    else:
+	print title + ': ' + msg
+      
+
+#class AutosyncJabberBot(jabberbot.JabberBot):
     #@botcmd
     #def whoami( self, mess, args):
         #"""Tells you your username"""
@@ -54,9 +64,7 @@ class OnWriteHandler(pyinotify.ProcessEvent):
 #        if all(not path.endswith(ext) for ext in self.extensions):
 #            return
 
-	if desktopnotify:
-	    n = pynotify.Notification('Local change', 'Committing changes in ' + path + " : " + action)
-	    n.show()
+	printmsg('Local change', 'Committing changes in ' + path + " : " + action)
 	
 #        subprocess.call(self.cmd.split(' '), cwd=self.cwd)
 
@@ -76,7 +84,7 @@ def auto_compile(path, pidfile, cmd, ignored):
     wm.add_watch(path, pyinotify.ALL_EVENTS, rec=True, auto_add=True)
     print '==> Start monitoring %s (type c^c to exit)' % path
     # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
-    notifier.loop();
+    notifier.loop()
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
@@ -98,12 +106,22 @@ if __name__ == '__main__':
 
     cmd = 'git add -A; git commit -m "Autocommit"'
 
-    # try to set up desktop notification
+    # try to set up desktop notification, first for KDE4, then for Gnome
+    try:
+	import dbus
+	knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
+	knotify.event("warning", "kde", [], 
+	    'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS', 
+	    [], [], 0, dbus_interface="org.kde.KNotify")
+	desktopnotifykde = True
+    except:
+	print 'KDE4 KNotify does not seem to run or dbus is not installed'
+    
     try:
 	import pynotify
 	if pynotify.init('autosync application'):
 	    print 'pynotify initializd successfully, will use desktop notifications'
-	    desktopnotify = True
+	    desktopnotifygnome = True
 	else:
 	    print 'there was a problem initializing the pynotify module'
     except:
@@ -117,9 +135,7 @@ if __name__ == '__main__':
     #bot.serve_forever(connect_callback = lambda: th.start())
     #bc.thread_killed = True
 
-    if desktopnotify:
-	n = pynotify.Notification('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
-	n.show()
+    printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
 
     # Blocks monitoring
     auto_compile(path, pidfile, cmd, excl)
