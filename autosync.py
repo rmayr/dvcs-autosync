@@ -23,7 +23,7 @@
 # Recommended packages:
 #   Pynotify for desktop notifications
 #
-import sys, os, functools, threading
+import sys, os, functools, threading, ConfigParser
 #import subprocess
 import pyinotify
 import jabberbot
@@ -51,10 +51,9 @@ def printmsg(title, msg):
         #return mess.getFrom()
 
 class OnWriteHandler(pyinotify.ProcessEvent):
-    def my_init(self, cwd, cmd, ignored):
+    def my_init(self, cwd, ignored):
         self.cwd = cwd
         self.ignored = ignored
-        self.cmd = cmd
 
     def _run_cmd(self, event, action):
 	path = event.pathname
@@ -77,9 +76,9 @@ class OnWriteHandler(pyinotify.ProcessEvent):
     def process_IN_MODIFY(self, event):
         self._run_cmd(event, 'add')
 
-def auto_compile(path, pidfile, cmd, ignored):
+def auto_compile(path, pidfile, ignored):
     wm = pyinotify.WatchManager()
-    handler = OnWriteHandler(cwd=path, cmd=cmd, ignored=ignored)
+    handler = OnWriteHandler(cwd=path, ignored=ignored)
     notifier = pyinotify.Notifier(wm, default_proc_fun=handler)
     wm.add_watch(path, pyinotify.ALL_EVENTS, rec=True, auto_add=True)
     print '==> Start monitoring %s (type c^c to exit)' % path
@@ -87,24 +86,22 @@ def auto_compile(path, pidfile, cmd, ignored):
     notifier.loop()
 
 if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print >> sys.stderr, 'Command line error: missing argument(s).'
-        sys.exit(1)
+    config = ConfigParser.RawConfigParser()
+    if len(sys.argv) >= 2:
+	config.read([sys.argv[1], '~/.autosync'])
+    else:
+	config.read('~/.autosync')
 
     # Required arguments
-    path = sys.argv[1]
-    pidfile = sys.argv[2]
+    path = config.get('autosync', 'path')
+    pidfile = config.get('autosync', 'pidfile')
 
     # Optional argument
     ignorefile = os.path.join(path, '.gitignore')
-    if len(sys.argv) == 4:
-        ignorefile = sys.argv[3]
     if os.path.exists(ignorefile):
 	excl = pyinotify.ExcludeFilter(ignorefile)
     else:
 	excl = None
-
-    cmd = 'git add -A; git commit -m "Autocommit"'
 
     # try to set up desktop notification, first for KDE4, then for Gnome
     try:
@@ -127,9 +124,9 @@ if __name__ == '__main__':
     except:
 	print 'pynotify does not seem to be installed'
 	
-    #username = 'myjabber@account.org'
-    #password = 'mypassword'
-    #bot = SystemInfoJabberBot(username,password)
+    username = config.get('jabber', 'username')
+    password = config.get('jabber', 'password')
+    #bot = AutosyncJabberBot(username,password)
     #bot.send(username, 'Logged into jabber account')
     #th = threading.Thread( target = bc.thread_proc)
     #bot.serve_forever(connect_callback = lambda: th.start())
@@ -138,4 +135,4 @@ if __name__ == '__main__':
     printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
 
     # Blocks monitoring
-    auto_compile(path, pidfile, cmd, excl)
+    auto_compile(path, pidfile, excl)
