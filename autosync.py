@@ -67,6 +67,7 @@ desktopnotifygnome = False
 knotify = None
 notifier = None
 bot = None
+hostname = None
 
 def printmsg(title, msg):
     try:
@@ -263,12 +264,16 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                     i=i+1 
             subprocess.call(cmdarray, cwd=self.cwd)
 
-    def _post_action_steps(self):
+    def _post_action_steps(self, curpath = None):
         with lock:
             # the status command should return 0 when nothing has changed
             retcode = subprocess.call(cmd_status, cwd=self.cwd, shell=True)
             if retcode != 0:
-                self._exec_cmd(cmd_commit)
+		if curpath:
+		    commitmsg = 'Autocommit of file %s changed on host %s' % (curpath, hostname)
+		else:
+		    commitmsg = 'Autocommit of all changes since last autosync startup on host %s' % hostname
+                self._exec_cmd(cmd_commit, commitmsg)
 	  
         if retcode != 0:
             # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
@@ -358,7 +363,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             print 'Committing changes in ' + curpath + " : " + lastaction
     
             self._exec_cmd(lastaction, parms)
-            self._post_action_steps()
+            self._post_action_steps(curpath)
             
 
     def process_IN_DELETE(self, event):
@@ -488,17 +493,17 @@ if __name__ == '__main__':
         print 'Error: unknown pull lock strategy %s, please use either conservative or optimized' % pulllock
         os.exit(100)
     
-    # Read required DCVS commands
-    cmd_status = config.get('dcvs', 'statuscmd')
-    cmd_startup = config.get('dcvs', 'startupcmd')
-    cmd_commit = config.get('dcvs', 'commitcmd')
-    cmd_push = config.get('dcvs', 'pushcmd')
-    cmd_pull = config.get('dcvs', 'pullcmd')
-    cmd_add = config.get('dcvs', 'addcmd')
-    cmd_rm = config.get('dcvs', 'rmcmd')
-    cmd_modify = config.get('dcvs', 'modifycmd')
-    cmd_move = config.get('dcvs', 'movecmd')
-    cmd_remoteurl = config.get('dcvs', 'remoteurlcmd')
+    # Read required DVCS commands
+    cmd_status = config.get('dvcs', 'statuscmd')
+    cmd_startup = config.get('dvcs', 'startupcmd')
+    cmd_commit = config.get('dvcs', 'commitcmd')
+    cmd_push = config.get('dvcs', 'pushcmd')
+    cmd_pull = config.get('dvcs', 'pullcmd')
+    cmd_add = config.get('dvcs', 'addcmd')
+    cmd_rm = config.get('dvcs', 'rmcmd')
+    cmd_modify = config.get('dvcs', 'modifycmd')
+    cmd_move = config.get('dvcs', 'movecmd')
+    cmd_remoteurl = config.get('dvcs', 'remoteurlcmd')
     
     # TODO: this is currently git-specific, should be configurable
     ignorefile = os.path.join(path, '.gitignore')
@@ -550,7 +555,8 @@ if __name__ == '__main__':
         alsonotify = config.get('xmpp', 'alsonotify')
     except:
         alsonotify = None
-    res = 'AutosyncJabberBot on %s' % os.uname()[1]
+    hostname = os.uname()[1]
+    res = 'AutosyncJabberBot on %s' % hostname
     try:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore",category=DeprecationWarning)
