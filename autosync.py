@@ -38,11 +38,6 @@
 # fs.inotify.max_user_watches and increasing it to a sufficient value 
 # (e.g. 500000).
 #
-# Dependencies:
-#   Linux, Python 2.6, Pyinotify (better performance with version >= 0.9), JabberBot (>= 0.9)
-# Recommended packages:
-#   Pynotify for desktop notifications
-#
 # ============================================================================
 # Copyright Rene Mayrhofer, 2010-2011
 #

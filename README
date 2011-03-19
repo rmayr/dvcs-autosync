@@ -20,6 +20,19 @@ It automatically ignores any patterns listed in .gitignore and the config file a
 
 [At any time in between]. When receiving a proper XMPP message, pull from the repository.
 
+Dependencies
+-----------------------
+
+ * Linux kernel with inotify enabled
+ * Python 2.6
+ * Pyinotify (better performance with version >= 0.9)
+ * patched JabberBot (>= 0.9) (included in this repository)
+ * xmpppy
+
+Recommended:
+
+ * Pynotify (for desktop notifications)
+
 
 Thoughts that should be considered at some point but have not yet been implemented:
 ------------------------
