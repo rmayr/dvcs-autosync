@@ -12,29 +12,6 @@
 # - allow to specify a commit/change message via traybar icon/popup message, maybe even in retrospect (rewriting history before pushing with a longer push delay)
 # - Make event coalescing specific to each file. That is, don't have a global event timer but only commit files if they did not change within X seconds. This would allow quick synchronization of files that are written and then not touched again while commits to files that are continiously being worked on would be kept in one (larger) commit.
 #
-# Background monitoring |path| and its subdirectories for modifications on
-# files and automatically commits the changes to git. This script assumes
-# that the configured directory is (a subdirectory) of a checked out git tree.
-# A PID file is written to [pidfile] for killing the daemon later on.
-# Optionally, an [ignores] file is read with one exclusion pattern per line
-# and files matching any of the patterns are ignored. This will typically be
-# the .gitignore file already existing the git tree.
-#
-# Note that for Jabber login, there probably needs to be a 
-# _xmpp-client._tcp.<domain name of jabber account> SRV entry in DNS so that 
-# the Python XMPP module can look up the server and port to use. Without such 
-# an SRV entry, Jabber login may fail even if the account details are correct 
-# and the server is reachable.
-#
-# Note, when there are errors 
-#  ERROR:pyinotify:add_watch: cannot watch ...
-# on startup, it will either be an invalid file or directory name which can 
-# not be watched for changes, or the number of files a user may watch 
-# concurrently using the kernel inotify interface has reached the set limit.
-# In the latter case, the limit can be changed by modifying the sysctl variable
-# fs.inotify.max_user_watches and increasing it to a sufficient value 
-# (e.g. 500000).
-#
 # ============================================================================
 # Copyright Rene Mayrhofer, 2010-2011
 #
