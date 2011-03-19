@@ -19,31 +19,44 @@
 #   ./autosync.py /my-git-work-tree
 #
 # Dependancies:
-#   Linux, Python 2.6, Pyinotify
+#   Linux, Python 2.6, Pyinotify, JabberBot
+# Recommended packages:
+#   Pynotify for desktop notifications
 #
-import functools
-import subprocess
 import sys
+import os
+import functools
+import threading
+#import subprocess
 import pyinotify
+from jabberbot import JabberBot, botcmd
+
+class SystemInfoJabberBot(JabberBot):
+    @botcmd
+    def whoami( self, mess, args):
+        """Tells you your username"""
+        return mess.getFrom()
 
 class OnWriteHandler(pyinotify.ProcessEvent):
-    def my_init(self, cwd, extension, cmd):
+    def my_init(self, cwd, cmd, ignored):
         self.cwd = cwd
-        self.ignores = 
+        self.ignored = ignored
         self.cmd = cmd
 
     def _run_cmd(self):
         print '==> Modification detected'
-        subprocess.call(self.cmd.split(' '), cwd=self.cwd)
+#        subprocess.call(self.cmd.split(' '), cwd=self.cwd)
 
     def process_IN_MODIFY(self, event):
-        if all(not event.pathname.endswith(ext) for ext in self.extensions):
-            return
+#        if all(not event.pathname.endswith(ext) for ext in self.extensions):
+#            return
+	n = pynotify.Notification("Local change", "Committing changes in " . event.pathname)
+	n.show()
         self._run_cmd()
 
-def auto_compile(path, pidfile, cmd):
+def auto_compile(path, pidfile, cmd, ignored):
     wm = pyinotify.WatchManager()
-    handler = OnWriteHandler(cwd=path, cmd=cmd)
+    handler = OnWriteHandler(cwd=path, cmd=cmd, ignored=ignored)
     notifier = pyinotify.Notifier(wm, default_proc_fun=handler)
     wm.add_watch(path, pyinotify.ALL_EVENTS, rec=True, auto_add=True)
     print '==> Start monitoring %s (type c^c to exit)' % path
@@ -63,10 +76,36 @@ if __name__ == '__main__':
     ignorefile = os.path.join(path, '.gitignore')
     if len(sys.argv) == 4:
         ignorefile = sys.argv[3]
-    if 
-    excl = pyinotify.ExcludeFilter(excl_file)
+    if os.path.exists(ignorefile):
+	excl = pyinotify.ExcludeFilter(ignorefile)
+    else:
+	excl = None
 
     cmd = 'git add -A; git commit -m "Autocommit"'
 
+    desktopnotify = False
+    # try to set up desktop notification
+    try:
+	import pynotify
+	if pynotify.init("autosync"):
+	    print "pynotify initializd successfully, will use desktop notifications"
+	    desktopnotify = True
+	else:
+	    print "there was a problem initializing the pynotify module"
+    except:
+	print "you don't seem to have pynotify installed"
+	
+    username = 'myjabber@account.org'
+    password = 'mypassword'
+    bot = SystemInfoJabberBot(username,password)
+    bot.send(username, 'Logged into jabber account')
+    th = threading.Thread( target = bc.thread_proc)
+    bot.serve_forever(connect_callback = lambda: th.start())
+    bc.thread_killed = True
+
+    if desktopnotify:
+	n = pynotify.Notifier('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
+	n.show()
+
     # Blocks monitoring
-    auto_compile(path, pidfile, cmd)
+    auto_compile(path, pidfile, cmd, excl)
