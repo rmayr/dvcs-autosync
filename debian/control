@@ -1,0 +1,15 @@
+Source: dvcs-autosync
+Section: utils
+Priority: options
+Maintainer: Rene Mayrhofer <rmayr@debian.org>
+Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7.0.50~)
+Standards-Version: 3.8.4
+Homepage: http://www.mayrhofer.eu.org/dvcs-autosync
+Vcs-Git: git@gitorious.org:dvcs-autosync/dvcs-autosync.git
+Vcs-Browser: http://gitorious.org/dvcs-autosync
+
+Package: dvcs-autosync
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Automatically synchronize distributed version control repositories
+ <insert long description, indented with spaces>
