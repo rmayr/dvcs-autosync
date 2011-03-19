@@ -29,13 +29,16 @@ import functools
 import threading
 #import subprocess
 import pyinotify
-from jabberbot import JabberBot, botcmd
+#from jabberbot import JabberBot, botcmd
 
-class SystemInfoJabberBot(JabberBot):
-    @botcmd
-    def whoami( self, mess, args):
-        """Tells you your username"""
-        return mess.getFrom()
+# some global variables, will be initialized in main
+desktopnotify = False
+
+#class SystemInfoJabberBot(JabberBot):
+    #@botcmd
+    #def whoami( self, mess, args):
+        #"""Tells you your username"""
+        #return mess.getFrom()
 
 class OnWriteHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, cmd, ignored):
@@ -50,8 +53,11 @@ class OnWriteHandler(pyinotify.ProcessEvent):
     def process_IN_MODIFY(self, event):
 #        if all(not event.pathname.endswith(ext) for ext in self.extensions):
 #            return
-	n = pynotify.Notification("Local change", "Committing changes in " . event.pathname)
-	n.show()
+
+	if desktopnotify:
+	    n = pynotify.Notification('Local change', 'Committing changes in ' + event.pathname)
+	    n.show()
+	
         self._run_cmd()
 
 def auto_compile(path, pidfile, cmd, ignored):
@@ -65,7 +71,7 @@ def auto_compile(path, pidfile, cmd, ignored):
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print >> sys.stderr, "Command line error: missing argument(s)."
+        print >> sys.stderr, 'Command line error: missing argument(s).'
         sys.exit(1)
 
     # Required arguments
@@ -83,28 +89,27 @@ if __name__ == '__main__':
 
     cmd = 'git add -A; git commit -m "Autocommit"'
 
-    desktopnotify = False
     # try to set up desktop notification
     try:
 	import pynotify
-	if pynotify.init("autosync"):
-	    print "pynotify initializd successfully, will use desktop notifications"
+	if pynotify.init('autosync application'):
+	    print 'pynotify initializd successfully, will use desktop notifications'
 	    desktopnotify = True
 	else:
-	    print "there was a problem initializing the pynotify module"
+	    print 'there was a problem initializing the pynotify module'
     except:
-	print "you don't seem to have pynotify installed"
+	print 'pynotify does not seem to be installed'
 	
-    username = 'myjabber@account.org'
-    password = 'mypassword'
-    bot = SystemInfoJabberBot(username,password)
-    bot.send(username, 'Logged into jabber account')
-    th = threading.Thread( target = bc.thread_proc)
-    bot.serve_forever(connect_callback = lambda: th.start())
-    bc.thread_killed = True
+    #username = 'myjabber@account.org'
+    #password = 'mypassword'
+    #bot = SystemInfoJabberBot(username,password)
+    #bot.send(username, 'Logged into jabber account')
+    #th = threading.Thread( target = bc.thread_proc)
+    #bot.serve_forever(connect_callback = lambda: th.start())
+    #bc.thread_killed = True
 
     if desktopnotify:
-	n = pynotify.Notifier('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
+	n = pynotify.Notification('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
 	n.show()
 
     # Blocks monitoring
