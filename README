@@ -27,11 +27,29 @@ Dependencies
  * Python 2.6
  * Pyinotify (better performance with version >= 0.9)
  * patched JabberBot (>= 0.9) (included in this repository)
+   the patch allows reception of messages from its own XMPP Id (will be pushed upstream later)
  * xmpppy
 
 Recommended:
 
  * Pynotify (for desktop notifications)
+
+Installation
+------------------------
+
+ * Copy autosync.py to a location in $PATH and jabberbot.py to a location in $PYTHONPATH
+ * (Quick and dirty: keep both in the same directory and run ./autosync.py later)
+
+Configuration
+-----------------------
+
+ * Copy the included .autosync-example config file to ~/.autosync (or wherever you want)
+ * Change it to your needs
+
+Running the program
+-----------------------
+
+    autosync.py [config file] # config defaults to ~/.autosync
 
 
 Thoughts that should be considered at some point but have not yet been implemented:
@@ -46,9 +64,6 @@ Thoughts that should be considered at some point but have not yet been implement
 
 - Allow to specify commit messages via popups. When ignored, use default commit message.
 
-Installation
-------------------------
-Simple. Copy the attached .autosync-example config file to ~/.autosync, change to your needs (paths including ignores and XMPP id/password), then run the autosync.py script. Note that it currently needs a slightly extended version of jabberbot.py (e.g. in the same directory from which autosync.py is executed) to allow reception of messages from its own XMPP Id. I would like to push these minimal changes upstream, but haven't done that so far.
 
 Disclaimer
 ------------------------

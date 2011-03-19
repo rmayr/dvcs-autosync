@@ -12,9 +12,6 @@
 # - allow to specify a commit/change message via traybar icon/popup message, maybe even in retrospect (rewriting history before pushing with a longer push delay)
 # - Make event coalescing specific to each file. That is, don't have a global event timer but only commit files if they did not change within X seconds. This would allow quick synchronization of files that are written and then not touched again while commits to files that are continiously being worked on would be kept in one (larger) commit.
 #
-# Usage:
-#   ./autosync.py [config file, default is ~/.autosync]
-#
 # Background monitoring |path| and its subdirectories for modifications on
 # files and automatically commits the changes to git. This script assumes
 # that the configured directory is (a subdirectory) of a checked out git tree.
