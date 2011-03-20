@@ -6,8 +6,10 @@ How does it do it?
 ------------------------
 0. Set up desktop notifications (for these nice bubble-style popups when anything happens) and log into a Jabber/XMPP account specified in the config file.
 
-1. Monitor a specific path for changes with inotify.
-At the moment, only one path is supported and multiple skript instances have to be run for multiple disjoint paths. This path is assumed to be (part of) a repository. Currently tested with git, but should support most DVCS (the config file allows to specify the DVCS commands called when interacting with it).
+1. Monitor a specific path (and its subdirectories) for changes with inotify.
+At the moment, only one path is supported and multiple script instances have to be run for multiple disjoint paths. This path is assumed to be (part of) a repository. Currently tested with git, but should support most DVCS (the config file allows to specify the DVCS commands called when interacting with it).
+Optionally, an [ignores] file is read with one exclusion pattern per line and files matching any of the patterns are ignored.
+This will typically be the .gitignore file already existing the git tree.
 
 2. When changes are detected, check them into the repository that is being monitored (or delete, or move, etc.).
 It automatically ignores any patterns listed in .gitignore and the config file allows to exclude other directories (e.g. repositories within the main repository).
@@ -18,8 +20,58 @@ It automatically ignores any patterns listed in .gitignore and the config file a
 
 5. After the push has finished, send an XMPP message to self (that is, to all clients logged in with the same account) to notify other accounts of the push.
 
-[At any time in between]. When receiving a proper XMPP message, pull from the repository.
+Furthermore:
 
+ * At any time in between, when receiving a proper XMPP message, pull from the repository.
+ * A PID file is written to [pidfile] for killing the daemon later on.
+
+Dependencies
+-----------------------
+
+ * Linux kernel with inotify enabled
+ * Python 2.6
+ * Pyinotify (better performance with version >= 0.9)
+ * patched JabberBot (>= 0.9) (included in this repository)
+   the patch allows reception of messages from its own XMPP Id (will be pushed upstream later)
+ * xmpppy
+
+Recommended:
+
+ * Pynotify (for desktop notifications)
+
+Installation
+------------------------
+
+ * Copy autosync.py to a location in $PATH and jabberbot.py to a location in $PYTHONPATH
+ * (Quick and dirty: keep both in the same directory and run ./autosync.py later)
+
+Configuration
+-----------------------
+
+ * Copy the included .autosync-example config file to ~/.autosync (or wherever you want)
+ * Change it to your needs
+
+Running the program
+-----------------------
+
+    autosync.py [config file] # config defaults to ~/.autosync
+
+Potential pitfalls
+----------------------
+ * for Jabber login, there probably needs to be a
+  _xmpp-client._tcp.<domain name of jabber account> SRV entry in DNS so that
+  the Python XMPP module can look up the server and port to use. Without such
+  an SRV entry, Jabber login may fail even if the account details are correct
+  and the server is reachable.
+
+ * when there are errors
+  ERROR:pyinotify:add_watch: cannot watch ...
+  on startup, it will either be an invalid file or directory name which can
+  not be watched for changes, or the number of files a user may watch
+  concurrently using the kernel inotify interface has reached the set limit.
+  In the latter case, the limit can be changed by modifying the sysctl variable
+  fs.inotify.max_user_watches and increasing it to a sufficient value
+  (e.g. 500000).
 
 Thoughts that should be considered at some point but have not yet been implemented:
 ------------------------
@@ -33,9 +85,6 @@ Thoughts that should be considered at some point but have not yet been implement
 
 - Allow to specify commit messages via popups. When ignored, use default commit message.
 
-Installation
-------------------------
-Simple. Copy the attached .autosync-example config file to ~/.autosync, change to your needs (paths including ignores and XMPP id/password), then run the autosync.py script. Note that it currently needs a slightly extended version of jabberbot.py (e.g. in the same directory from which autosync.py is executed) to allow reception of messages from its own XMPP Id. I would like to push these minimal changes upstream, but haven't done that so far.
 
 Disclaimer
 ------------------------
