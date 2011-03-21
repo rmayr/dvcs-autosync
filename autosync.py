@@ -2,18 +2,25 @@
 # -*- coding: utf-8 -*-
 #
 # Version 0.3
-# TODO:
-# * find out why the Jabber msg-to-self doesn't work in some cases
-# * determine if pulling directly from those repositories which caused the changes is quicker then from central
-# * optimize pulls and pushes during startup
-# * implement optimistic pull lock for better performance
-# TODO future versions:
+# TODO - currently known bugs:
+# - Moving directories is not tracked properly with the current event coalescing. Find out how to do a directory move in a better way or simply pass the "-r" option to git when working on directories.
+# - definitely coalesce multiple file events within a time window instead of creating one commit for each file, e.g. when moving whole directory hierarchies (don't clutter the commit history with each file commit separately)
+# - find out why the Jabber msg-to-self doesn't work in some cases
+# TODO - short term:
+# - autocommit messages should not only include the file path, but also the action performed on the file (as many details as could be helpful for later analysis)
+# - determine if pulling directly from those repositories which caused the changes is quicker then from central
+# - optimize pulls and pushes during startup
+# - implement optimistic pull lock for better performance
+# TODO - future versions:
 # - automatically add some context to commit messages (e.g. location, applications open at the same time, etc.)
 # - allow to specify a commit/change message via traybar icon/popup message, maybe even in retrospect (rewriting history before pushing with a longer push delay)
-# - Make event coalescing specific to each file. That is, don't have a global event timer but only commit files if they did not change within X seconds. This would allow quick synchronization of files that are written and then not touched again while commits to files that are continiously being worked on would be kept in one (larger) commit.
+# - Find a good combination of global and file-based event coalescing. This would allow quick synchronization of files that are written and then not touched again while commits to files that are continiously being worked on would be kept in one (larger) commit. There are (at least) 2 use cases to take into account: copying/moving/removing whole directories that should be kept in one big commit and synced quickly, and one file being open in an editor application and being written to more or less continuously. In the latter case, we need to find a compromise between too many commits and to few (which is a problem when accidentally deleting text that was written an hour earlier and that should be recoverable).
 #
 # ============================================================================
 # Copyright Rene Mayrhofer, 2010-2011
+#
+# Contributors:
+# * Dieter Plaetinck
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -253,7 +260,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 		    commitmsg = 'Autocommit of file %s changed on host %s' % (curpath, hostname)
 		else:
 		    commitmsg = 'Autocommit of all changes since last autosync startup on host %s' % hostname
-                self._exec_cmd(cmd_commit, commitmsg)
+                self._exec_cmd(cmd_commit, [commitmsg])
 	  
         if retcode != 0:
             # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
