@@ -45,6 +45,16 @@ Installation
  * Copy autosync.py to a location in $PATH and jabberbot.py to a location in $PYTHONPATH
  * (Quick and dirty: keep both in the same directory and run ./autosync.py later)
 
+Create the repository and do initial push
+----------------------
+
+ $ ssh server git init --bare autosync.git
+ $ cd ~ && git clone server:autosync.git autosync
+ $ cd autosync
+ $ [ populate initial contents and add to index ]
+ $ git commit -m 'Initial commit'
+ $ git push origin master
+
 Configuration
 -----------------------
 
