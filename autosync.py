@@ -38,17 +38,28 @@ notifier = None
 bot = None
 hostname = None
 
-def printmsg(title, msg):
+def printmsg(title, msg, level=logging.INFO):
+    urgencies = {logging.DEBUG: pynotify.URGENCY_LOW,
+                 logging.INFO: pynotify.URGENCY_NORMAL,
+                 logging.WARNING: pynotify.URGENCY_CRITICAL,
+                 logging.ERROR: pynotify.URGENCY_CRITICAL,
+                 logging.CRITICAL: pynotify.URGENCY_CRITICAL}
+    # there are probably more levels but I couldn't find the appropriate docs
+    kdelevels = {logging.DEBUG: 'info',
+                 logging.INFO: 'info',
+                 logging.WARNING: 'warning',
+                 logging.ERROR: 'warning',
+                 logging.CRITICAL: 'warning'}
     try:
         if desktopnotifygnome:
             n = pynotify.Notification(title, msg)
+            n.set_urgency(urgencies[level])
             n.show()
         elif desktopnotifykde:
-            knotify.event('info', 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
-        else:
-            print title + ': ' + msg
+            knotify.event(kdelevels[level], 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
     except:
-        print title + ': ' + msg
+        pass
+    logging.log(level, "NOTIFICATION: %s: %s" % (title, msg))
 
 
 # this helper class has been shamelessly copied from http://socialwire.ca/2010/01/python-resettable-timer-example/
@@ -139,17 +150,17 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         self.__running = False
         jabberbot.JabberBot.__init__(self, username, password, res, debug, ignoreownmsg)
 
-    def log( self, s):
-        logging.debug('AutosyncJabberbot:' + s)
+    def log( self, s, level=logging.DEBUG):
+        logging.log(level, 'AutosyncJabberbot:' + s)
 
     def _process_thread(self):
-        print 'Background Jabber bot thread starting'
+        self.log('Background Jabber bot thread starting')
         while self.__running:
             try:
                 self.conn.Process(1)
                 self.idle_proc()
             except IOError:
-                print 'Received IOError while trying to handle incoming messages, trying to reconnect now'
+                self.log('Received IOError while trying to handle incoming messages, trying to reconnect now', logging.WARNING)
                 self.connect()
 
     def start_serving(self):
@@ -157,7 +168,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         if self.conn:
             self.log('bot connected. serving forever.')
         else:
-            self.log('could not connect to server - aborting.')
+            self.log('could not connect to server - aborting.', logging.WARNING)
             return
 
         self.__running = True
@@ -178,7 +189,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             try:
                 jabberbot.JabberBot.send(self, user, text, in_reply_to, message_type)
             except IOError:
-                print 'Received IOError while trying to send message, trying to reconnect now'
+                self.log('Received IOError while trying to send message, trying to reconnect now', logging.WARNING)
                 self.stop_serving()
                 self.start_serving()
   
@@ -189,16 +200,16 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
     @botcmd
     def ping(self, mess, args):
-        print 'Received ping command over Jabber channel'
+        self.log('Received ping command over Jabber channel')
         return 'pong'
         
     @botcmd
     def pushed(self, mess, args):
-        print 'Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom())
+        self.log('Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom()))
         if mess.getFrom() == str(self.jid) + '/' + self.res:
-            print 'Ignoring own pushed message looped back by server'
+            self.log('Ignoring own pushed message looped back by server')
         else:
-            print 'TRYING TO PULL FROM %s' % args
+            self.log('Trying to pull from %s' % args)
             with lock:
                 handler.protected_pull()
 
@@ -227,7 +238,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                 j = 0
                 while i < len(cmdarray):
                     if cmdarray[i] == '%s':
-                        logging.debug('Substituting cmd part %s with %s' % (cmdarray[i], parms[j]))
+                        logging.debug('Substituting cmd part %s with %s', cmdarray[i], parms[j])
                         cmdarray[i] = parms[j]
                         j=j+1
                     i=i+1 
@@ -249,25 +260,25 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
             # then these changes will be pushed in one go
             if self._push_timer and self._push_timer.is_alive():
-                print 'Resetting already active push timer to new timeout of %s seconds until push would occur' % readfrequency
+                logging.debug('Resetting already active push timer to new timeout of %s seconds until push would occur', readfrequency)
                 self._push_timer.reset()
             else:
-                print 'Starting push timer with %s seconds until push would occur (if no other changes happen in between)' % readfrequency
+                logging.debug('Starting push timer with %s seconds until push would occur (if no other changes happen in between)', readfrequency)
                 self._push_timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
                 self._push_timer.start()
         else:
-            print 'Git reported that there is nothing to commit, not touching commit timer'
+            logging.debug('Git reported that there is nothing to commit, not touching commit timer')
 
     def _queue_action(self, event, action, parms, act_on_dirs=False):
         curpath = event.pathname
         if self._ignore_events:
-            print 'Ignoring event %s to %s, it is most probably caused by a remote change being currently pulled' % (event.maskname, event.pathname)
+            logging.debug('Ignoring event %s to %s, it is most probably caused by a remote change being currently pulled', event.maskname, event.pathname)
             return
         if event.dir and not act_on_dirs:
-            print 'Ignoring change to directory ' + curpath
+            logging.debug('Ignoring change to directory %s', curpath)
             return
         if any(fnmatch.fnmatch(curpath, pattern) for pattern in self.ignored):
-            print 'Ignoring change to file %s because it matches the ignored patterns from .gitignore' % curpath
+            logging.debug('Ignoring change to file %s because it matches the ignored patterns from .gitignore', curpath)
             return
 
         # remember the event for this file, but don't act on it immediately
@@ -281,10 +292,10 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # and each entry in the list is a tuple of event name and associated action
             self._file_events[curpath][0].append((event.maskname, action))
             if self._file_events[curpath][1] and self._file_events[curpath][1].is_alive():
-                print 'Resetting already active coalesce timer to new timeout of %s seconds until coalescing events for file %s would occur' % (coalesce_seconds, curpath)
+                logging.debug('Resetting already active coalesce timer to new timeout of %s seconds until coalescing events for file %s would occur', coalesce_seconds, curpath)
                 self._file_events[curpath][1].reset()
             else:
-                print 'Starting coalesce timer with %s seconds until coalescing events for file %s would occur (if no other changes happen in between)' % (coalesce_seconds, curpath)
+                logging.debug('Starting coalesce timer with %s seconds until coalescing events for file %s would occur (if no other changes happen in between)', coalesce_seconds, curpath)
                 self._file_events[curpath][1] = ResettableTimer(maxtime=coalesce_seconds, expire=self._filter_and_handle_actions, inc=1, arg=[curpath, parms])
                 self._file_events[curpath][1].start()
             
@@ -292,14 +303,14 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         curpath = args[0]
         parms = args[1]
             
-        print 'Coalesce event triggered for file ' + curpath
+        logging.info('Coalesce event triggered for file %s', curpath)
         with lock:
-            print 'Considering file %s, which has the following events recorded:' % curpath
+            logging.debug('Considering file %s, which has the following events recorded:', curpath)
             events, timer = self._file_events[curpath]
             lastevent = None
             lastaction = None
             for eventtype, action in events:
-                print '   Event type=%s, action=%s' % (eventtype, action)
+                logging.debug('   Event type=%s, action=%s', eventtype, action)
                 
                 if not lastevent:
                     lastevent = eventtype
@@ -323,13 +334,12 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                     lastevent = eventtype
                     lastaction = action
 
-            print 'Final action for file %s: type=%s, action=%s' % (curpath, lastevent, lastaction)
+            logging.info('Final action for file %s: type=%s, action=%s', curpath, lastevent, lastaction)
 
             # and clear again for next events coalescing
             del self._file_events[curpath]
             
-            printmsg('Local change', 'Committing changes in ' + curpath + " : " + lastaction)
-            print 'Committing changes in ' + curpath + " : " + lastaction
+            printmsg('Local change', 'Committing changes in %s: %s' % (curpath, lastaction))
     
             self._exec_cmd(lastaction, parms)
             self._post_action_steps(curpath)
@@ -338,7 +348,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
     def process_IN_DELETE(self, event):
         # sanity check - don't remove file if it still exists in the file system!
         if os.path.exists(event.pathname):
-            print 'Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application' % event.pathname
+            logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
             return
          
         self._queue_action(event, cmd_rm, [event.pathname])
@@ -358,14 +368,14 @@ class FileChangeHandler(pyinotify.ProcessEvent):
     def process_IN_MOVED_TO(self, event):
         try:
             if event.src_pathname:
-                print 'Detected moved file from %s to %s' % (event.src_pathname, event.pathname)
+                logging.debug('Detected moved file from %s to %s', event.src_pathname, event.pathname)
                 self._queue_action(event, cmd_move, [event.src_pathname, event.pathname], act_on_dirs=True)
             else:
-                print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
+                logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
                 self._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
         except AttributeError:
             # we don't even have the attribute in the event, so also add
-            print 'Moved file to %s, but unknown source, will simply add new file' % event.pathname
+            logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
             self._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
 	    
     def timer_tick(self, counter):
@@ -373,13 +383,12 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	
     def startup(self):
         with lock:
-            print 'Running startup command to check for local changes now: ' + cmd_startup
+            logging.info('Running startup command to check for local changes now: %s', cmd_startup)
             self._exec_cmd(cmd_startup)
             self._post_action_steps()
 	    
     def _real_push(self, arg):
         printmsg('Pushing changes', 'Pushing last local changes to remote repository')
-        print 'Pushing last local changes to remote repository'
         with lock:
             # TODO: check if we actually need a pull or a check-for-pull here 
             # or if all race conditions were already ruled out
@@ -399,7 +408,6 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 
     def protected_pull(self):
         printmsg('Pulling changes', 'Pulling changes from remote repository')
-        print 'Pulling changes from remote repository'
         # need to handle file change notification while applying remote
         # changes caused by the pull: either conservative (ignore all
         # file notifications while the pull is running) or optimized (replay the
@@ -422,7 +430,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 
 
 def signal_handler(signal, frame):
-    print 'You pressed Ctrl+C, exiting gracefully!'
+    logging.info('You pressed Ctrl+C, exiting gracefully!')
     if notifier:
         notifier.stop()
     if bot:
@@ -437,13 +445,14 @@ if __name__ == '__main__':
         config.read([sys.argv[1], defaultcfgpath])
     else:
         config.read(defaultcfgpath)
+    logging.basicConfig(level=logging.DEBUG)
 
     pathstr = config.get('autosync', 'path')
     path = os.path.normpath(os.path.expanduser(pathstr))
     if os.path.isdir(path):
-        print 'Watching path ' + path
+        logging.info('Watching path %s', path)
     else:
-        print 'Error: path ' + path + ' (expanded from ' + pathstr + ') does not exist'
+        logging.error('path %s (expanded from %s) does not exist', path, pathstr)
         os.exit(100)
     
     pidfile = config.get('autosync', 'pidfile')
@@ -456,10 +465,10 @@ if __name__ == '__main__':
         conservative_pull_lock = True
     elif pulllock == 'optimized':
         conservative_pull_lock = False
-        print 'Error: optimized pull strategy not fully implemented yet (event replay queue missing)'
+        logging.error('Optimized pull strategy not fully implemented yet (event replay queue missing)')
         os.exit(101)
     else:
-        print 'Error: unknown pull lock strategy %s, please use either conservative or optimized' % pulllock
+        logging.error('Unknown pull lock strategy %s, please use either conservative or optimized', pulllock)
         os.exit(100)
     
     # Read required DVCS commands
@@ -484,14 +493,13 @@ if __name__ == '__main__':
     else:
         ignorefilepatterns = []
     # (unfortunately, can't use pyinotify.ExcludeFilter, because this expects regexes (which .gitignore doesn't support))
-    print 'Ignoring files matching any of the patterns ' + ' '.join(ignorefilepatterns)
+    logging.info('Ignoring files matching any of the patterns %s', ' '.join(ignorefilepatterns))
 
     # but we can use the ignore filter with our own pathname excludes
     # However, need to prepend the watch path name, as the excludes need to be 
     # absolute path names.
     ignoreabsolutepaths = [os.path.normpath(path + os.sep + ignorepath) for ignorepath in ignorepaths.split()]
-    print 'Adding list to inotify exclude filter: '
-    print ignoreabsolutepaths
+    logging.info('Adding list to inotify exclude filter: %s', ignoreabsolutepaths)
     excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
 
     signal.signal(signal.SIGINT, signal_handler)
@@ -511,12 +519,12 @@ if __name__ == '__main__':
     try:
         import pynotify
         if pynotify.init('autosync application'):
-            print 'pynotify initialized successfully, will use desktop notifications'
+            logging.info('pynotify initialized successfully, will use desktop notifications')
             desktopnotifygnome = True
         else:
-            print 'there was a problem initializing the pynotify module'
+            logging.warning('there was a problem initializing the pynotify module')
     except:
-        print 'pynotify does not seem to be installed'
+        logging.info('pynotify does not seem to be installed')
 	
     username = config.get('xmpp', 'username')
     password = config.get('xmpp', 'password')
@@ -534,11 +542,10 @@ if __name__ == '__main__':
         bot.send(username, 'login %s' % res)
         if alsonotify:
             bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
-        printmsg('Autosync Jabber login successful', 'Successfully logged into Jabber account ' + username)
-    except Exception as inst:
-        print type(inst)
-        print inst
-        printmsg('Autosync Jabber login failed', 'Could not login to Jabber account ' + username + '. Will not announce pushes to other running autosync instances.')	
+        printmsg('Autosync Jabber login successful', 'Successfully logged into account %s' % username)
+    except Exception as e:
+        logging.warning("Exception %s: %s", type(e), e)
+        printmsg('Autosync Jabber login failed', 'Could not login to Jabber account %s. Will not announce pushes to other running autosync instances.' % username)
 
     wm = pyinotify.WatchManager()
     handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
@@ -548,33 +555,33 @@ if __name__ == '__main__':
     # coalescing events needs pyinotify >= 0.9, so make this optional
     try:
         notifier.coalesce_events()
-    except AttributeError as inst:
-        print 'Can not coalesce events, pyinotify does not seem to support it (maybe too old): %s' % inst
+    except AttributeError as e:
+        logging.warning('Cannot coalesce events, pyinotify does not seem to support it (maybe too old): %s', e)
     mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
     try:
-        print 'Adding recursive, auto-adding watch for path %s with event mask %d' % (path, mask)
+        logging.debug('Adding recursive, auto-adding watch for path %s with event mask %d', path, mask)
         wd = wm.add_watch(path, mask, rec=True, auto_add=True, quiet=False, exclude_filter=excl)
         if wd <= 0:
-            print 'Unable to add watch for path %s - this will not work' % path
-    except pyinotify.WatchManagerError, err:
-        print err, err.wmd
+            logging.warning('Unable to add watch for path %s - this will not work', path)
+    except pyinotify.WatchManagerError, e:
+        logging.warning("pyinotify.WatchManagerError: %s, %s", e, e.wmd)
 
     printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
     
     # this is a central lock for guarding repository operations
     lock = threading.RLock()
 
-    print '==> Start monitoring %s (type c^c to exit)' % path
+    logging.info('Start monitoring %s (type c^c to exit)', path)
     # TODO: daemonize
     # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
     notifier.start()
-    print '=== Executing startup synchronizaion'
+    logging.info('Executing startup synchronizaion')
     handler.protected_pull()
     if not conservative_pull_lock:
         # only need to run the startup command here when not using conservative pull locking - otherwise the protected_pull will already do it
         handler.startup()
     
-    print '----------------------------------------------------------------'
+    logging.info('----------------------------------------------------------------')
 
     while True:
         time.sleep(10)
