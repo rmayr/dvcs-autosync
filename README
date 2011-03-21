@@ -48,17 +48,26 @@ Installation
 Create the repository and do initial push
 ----------------------
 
- $ ssh server git init --bare autosync.git
- $ cd ~ && git clone server:autosync.git autosync
+ [on the server used to host the central git repository] 
+ $ git init --bare autosync.git
+
+ [on the first host using that repository]
+ $ cd ~ && git clone <server>:autosync.git autosync
  $ cd autosync
  $ [ populate initial contents and add to index ]
  $ git commit -m 'Initial commit'
  $ git push origin master
 
+ [on each additional host]
+ $ cd ~ && git clone <server>:autosync.git autosync
+ $ cd autosync
+
+Note that these are only examples. You can use arbitrary directories and repositories.
+
 Configuration
 -----------------------
 
- * Create an xmpp account (for example on jabber.org, or set up your own server)
+ * Create an XMPP/Jabber account (for example on jabber.org, or set up your own server)
  * Copy the included .autosync-example config file to ~/.autosync (or wherever you want)
  * Change it to your needs
 
