@@ -1,0 +1,27 @@
+===============================================================================
+This document should be modified to reflect the current state of development.
+===============================================================================
+
+TODO - currently known bugs:
+----------------------------
+* Moving directories is not tracked properly with the current event coalescing. Find out how to do a directory move in a better way or simply pass the "-r" option to git when working on directories.
+* definitely coalesce multiple file events within a time window instead of creating one commit for each file, e.g. when moving whole directory hierarchies (don't clutter the commit history with each file commit separately)
+* find out why the Jabber msg-to-self doesn't work in some cases
+
+TODO - short term:
+------------------
+* autocommit messages should not only include the file path, but also the action performed on the file (as many details as could be helpful for later analysis)
+* determine if pulling directly from those repositories which caused the changes is quicker then from central
+* optimize pulls and pushes during startup
+* implement optimistic pull lock for better performance
+* Find a good combination of global and file-based event coalescing. This would allow quick synchronization of files that are written and then not touched again while commits to files that are continiously being worked on would be kept in one (larger) commit. There are (at least) 2 use cases to take into account: copying/moving/removing whole directories that should be kept in one big commit and synced quickly, and one file being open in an editor application and being written to more or less continuously. In the latter case, we need to find a compromise between too many commits and to few (which is a problem when accidentally deleting text that was written an hour earlier and that should be recoverable).
+
+TODO - future versions:
+-----------------------
+* automatically add some context to commit messages (e.g. location, applications open at the same time, etc.)
+* allow to specify a commit/change message via traybar icon/popup message, maybe even in retrospect (rewriting history before pushing with a longer push delay)
+
+Ideas:
+------
+One approach to the local/global coalescing compromise would be to put all files that are changed within <X> seconds into a waiting list for the event processing. Then, keep a time with each file to remember when the last change was. When files have not been changed for <Y> seconds, move them into a "pending commit" list. When the number of files in the "pending commit" list becomes large (with some threshold) and the remaining still-being-written-to files list becomes small and (that's the important part) _stable_ (in terms of no longer adding/removing new files), then break them into two groups, make a commit of the pending list and keep the other files until they settle down.
+
