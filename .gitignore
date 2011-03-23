@@ -1,0 +1,11 @@
+*~
+.~lock.*#
+*.backup
+*.old
+*.aux
+*.blg
+*.bbl
+*.bib.bak
+*.pyc
+.swp.*
+qt_temp.*
