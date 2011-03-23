@@ -31,7 +31,7 @@ Dependencies
  * Python 2.6
  * Pyinotify (better performance with version >= 0.9)
  * patched JabberBot (>= 0.9) (included in this repository)
-   the patch allows reception of messages from its own XMPP Id (will be pushed upstream later)
+   the patch allows reception of messages from its own XMPP id (patch already pushed upstream and will be included in next upstream JabberBot version)
  * xmpppy
 
 Recommended:
@@ -58,8 +58,7 @@ Create the repository and do initial push
  $ git push origin master
 
  [on each additional host]
- $ cd ~ && git clone <server>:autosync.git autosync
- $ cd autosync
+ $ git clone <server>:autosync.git autosync
 
 Note that these are only examples. You can use arbitrary directories and repositories.
 
