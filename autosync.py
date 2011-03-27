@@ -394,7 +394,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
 	
         # and try to notify other instances
         if bot:
-            proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE)
+            proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
             (remoteurl, errors) = proc.communicate()
             for sendto in [username, alsonotify]:
                 if sendto:
