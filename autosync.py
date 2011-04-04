@@ -141,13 +141,14 @@ class ResettableTimer(threading.Thread):
 
 class AutosyncJabberBot(jabberbot.JabberBot):
     def __init__(self, username, password, res=None, debug=False, ignoreownmsg=True):
-        self.__running = False
+        self._running = False
+        self._unsent = []
         jabberbot.JabberBot.__init__(self, username, password, res, debug, ignoreownmsg)
         self.PING_FREQUENCY = 30
 
     def _process_thread(self):
         self.log.info('Background Jabber bot thread starting')
-        while self.__running:
+        while self._running:
             try:
                 if self.conn.Process(1) is None:
                     # Process() does not raise IOErrors
@@ -158,9 +159,19 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             except IOError:
                 self.conn = None
                 self.log.warning('Received IOError while trying to handle incoming messages, trying to reconnect now')
-                while not self.conn and self.__running:
+                while not self.conn and self._running:
                     time.sleep(10)
                     self.conn = self.connect()
+
+            # copy self._unsent, s.t. it doesn't gets an infinite loop
+            # this could happen if we try to send a msg, this fails
+            # and then it gets re-appended to self._unsent -- where we try
+            # to send it again ... and again ... and again...
+            unsent = self._unsent
+            self._unsent = []
+            while unsent:
+                msg = unsent.pop()
+                self.send(*msg)
 
     def start_serving(self):
         self.connect()
@@ -170,10 +181,10 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             self.log.warning('could not connect to server - aborting.')
             return
 
-        self.__running = True
+        self._running = True
         self._lastping = time.time()
-        self.__thread = threading.Thread(target=self._process_thread)
-        self.__thread.start()
+        self._thread = threading.Thread(target=self._process_thread)
+        self._thread.start()
 
         # this is a hack to get other bots to add this one to their "seen" lists
         # TODO: still doesn't work, figure out how to use JabberBot to get rid of
@@ -181,8 +192,8 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         self.conn.send(xmpp.Presence(to=username))
 
     def stop_serving(self):
-        self.__running = False
-        self.__thread.join()
+        self._running = False
+        self._thread.join()
 
     def on_ping_timeout(self):
         raise IOError, "Ping timeout"
@@ -191,10 +202,11 @@ class AutosyncJabberBot(jabberbot.JabberBot):
     def send(self, user, text, in_reply_to=None, message_type='chat'):
         try:
             jabberbot.JabberBot.send(self, user, text, in_reply_to, message_type)
-        except IOError:
-            self.log.warning('Received IOError while trying to send message, trying to reconnect now')
-            self.stop_serving()
-            self.start_serving()
+        except (AttributeError, IOError):
+            if self.conn is not None: # error is something different
+                raise
+            self.log.warning('Received an error while trying to send message. Will send it later.')
+            self._unsent.append((user, text, in_reply_to, message_type))
   
     @botcmd
     def whoami(self, mess, args):
