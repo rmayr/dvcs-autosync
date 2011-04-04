@@ -143,16 +143,24 @@ class AutosyncJabberBot(jabberbot.JabberBot):
     def __init__(self, username, password, res=None, debug=False, ignoreownmsg=True):
         self.__running = False
         jabberbot.JabberBot.__init__(self, username, password, res, debug, ignoreownmsg)
+        self.PING_FREQUENCY = 30
 
     def _process_thread(self):
         self.log.info('Background Jabber bot thread starting')
         while self.__running:
             try:
-                self.conn.Process(1)
+                if self.conn.Process(1) is None:
+                    # Process() does not raise IOErrors
+                    # instead it returns None if there is no data
+                    self.log.warning('Link down')
+                    raise IOError
                 self.idle_proc()
             except IOError:
+                self.conn = None
                 self.log.warning('Received IOError while trying to handle incoming messages, trying to reconnect now')
-                self.connect()
+                while not self.conn and self.__running:
+                    time.sleep(10)
+                    self.conn = self.connect()
 
     def start_serving(self):
         self.connect()
@@ -163,6 +171,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             return
 
         self.__running = True
+        self._lastping = time.time()
         self.__thread = threading.Thread(target=self._process_thread)
         self.__thread.start()
 
@@ -174,6 +183,9 @@ class AutosyncJabberBot(jabberbot.JabberBot):
     def stop_serving(self):
         self.__running = False
         self.__thread.join()
+
+    def on_ping_timeout(self):
+        raise IOError, "Ping timeout"
 	
     # override the send method so that connection errors can be handled by trying to reconnect
     def send(self, user, text, in_reply_to=None, message_type='chat'):
