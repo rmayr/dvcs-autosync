@@ -144,25 +144,22 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         self.__running = False
         jabberbot.JabberBot.__init__(self, username, password, res, debug, ignoreownmsg)
 
-    def log( self, s, level=logging.DEBUG):
-        logging.log(level, 'AutosyncJabberbot:' + s)
-
     def _process_thread(self):
-        self.log('Background Jabber bot thread starting')
+        self.log.info('Background Jabber bot thread starting')
         while self.__running:
             try:
                 self.conn.Process(1)
                 self.idle_proc()
             except IOError:
-                self.log('Received IOError while trying to handle incoming messages, trying to reconnect now', logging.WARNING)
+                self.log.warning('Received IOError while trying to handle incoming messages, trying to reconnect now')
                 self.connect()
 
     def start_serving(self):
         self.connect()
         if self.conn:
-            self.log('bot connected. serving forever.')
+            self.log.info('bot connected. serving forever.')
         else:
-            self.log('could not connect to server - aborting.', logging.WARNING)
+            self.log.warning('could not connect to server - aborting.')
             return
 
         self.__running = True
@@ -183,7 +180,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             try:
                 jabberbot.JabberBot.send(self, user, text, in_reply_to, message_type)
             except IOError:
-                self.log('Received IOError while trying to send message, trying to reconnect now', logging.WARNING)
+                self.log.warning('Received IOError while trying to send message, trying to reconnect now')
                 self.stop_serving()
                 self.start_serving()
   
@@ -194,16 +191,16 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
     @botcmd
     def ping(self, mess, args):
-        self.log('Received ping command over Jabber channel')
+        self.log.debug('Received ping command over Jabber channel')
         return 'pong'
         
     @botcmd
     def pushed(self, mess, args):
-        self.log('Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom()))
+        self.log.debug('Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom()))
         if mess.getFrom() == str(self.jid) + '/' + self.res:
-            self.log('Ignoring own pushed message looped back by server')
+            self.log.debug('Ignoring own pushed message looped back by server')
         else:
-            self.log('Trying to pull from %s' % args)
+            self.log.debug('Trying to pull from %s' % args)
             with lock:
                 handler.protected_pull()
 
