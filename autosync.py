@@ -175,14 +175,14 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         self.__running = False
         self.__thread.join()
 	
-        # override the send method so that connection errors can be handled by trying to reconnect
-        def send(self, user, text, in_reply_to=None, message_type='chat'):
-            try:
-                jabberbot.JabberBot.send(self, user, text, in_reply_to, message_type)
-            except IOError:
-                self.log.warning('Received IOError while trying to send message, trying to reconnect now')
-                self.stop_serving()
-                self.start_serving()
+    # override the send method so that connection errors can be handled by trying to reconnect
+    def send(self, user, text, in_reply_to=None, message_type='chat'):
+        try:
+            jabberbot.JabberBot.send(self, user, text, in_reply_to, message_type)
+        except IOError:
+            self.log.warning('Received IOError while trying to send message, trying to reconnect now')
+            self.stop_serving()
+            self.start_serving()
   
     @botcmd
     def whoami(self, mess, args):
@@ -535,7 +535,7 @@ if __name__ == '__main__':
             bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
         printmsg('Autosync Jabber login successful', 'Successfully logged into account %s' % username)
     except Exception as e:
-        logging.warning("Exception %s: %s", type(e), e)
+        logging.error("Exception %s: %s", type(e), e)
         printmsg('Autosync Jabber login failed', 'Could not login to Jabber account %s. Will not announce pushes to other running autosync instances.' % username)
 
     wm = pyinotify.WatchManager()
