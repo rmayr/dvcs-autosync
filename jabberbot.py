@@ -90,7 +90,7 @@ class JabberBot(object):
         self.__status = None
         self.__seen = {}
         self.__threads = {}
-        self.__lastping = None
+        self._lastping = None
         self.__privatedomain = privatedomain
         self.__acceptownmsgs = acceptownmsgs
 
@@ -298,7 +298,7 @@ class JabberBot(object):
                 self.send(jid, message)
 
     def callback_presence(self, conn, presence):
-        self.__lastping = time.time()
+        self._lastping = time.time()
         jid, type_, show, status = presence.getFrom(), \
                 presence.getType(), presence.getShow(), \
                 presence.getStatus()
@@ -372,7 +372,7 @@ class JabberBot(object):
 
     def callback_message( self, conn, mess):
         """Messages sent to the bot will arrive here. Command handling + routing is done in this function."""
-        self.__lastping = time.time()
+        self._lastping = time.time()
 
         # Prepare to handle either private chats or group chats
         type     = mess.getType()
@@ -502,8 +502,8 @@ class JabberBot(object):
 
         To enable set self.PING_FREQUENCY to a value higher than zero.
         """
-        if self.PING_FREQUENCY and time.time() - self.__lastping > self.PING_FREQUENCY:
-            self.__lastping = time.time()
+        if self.PING_FREQUENCY and time.time() - self._lastping > self.PING_FREQUENCY:
+            self._lastping = time.time()
             #logging.debug('Pinging the server.')
             ping = xmpp.Protocol('iq',typ='get',payload=[xmpp.Node('ping',attrs={'xmlns':'urn:xmpp:ping'})])
             try:
@@ -538,7 +538,7 @@ class JabberBot(object):
 
         if connect_callback:
             connect_callback()
-        self.__lastping = time.time()
+        self._lastping = time.time()
 
         while not self.__finished:
             try:
