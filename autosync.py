@@ -141,33 +141,49 @@ class ResettableTimer(threading.Thread):
 
 class AutosyncJabberBot(jabberbot.JabberBot):
     def __init__(self, username, password, res=None, debug=False, ignoreownmsg=True):
-        self.__running = False
+        self._running = False
+        self._unsent = []
         jabberbot.JabberBot.__init__(self, username, password, res, debug, ignoreownmsg)
-
-    def log( self, s, level=logging.DEBUG):
-        logging.log(level, 'AutosyncJabberbot:' + s)
+        self.PING_FREQUENCY = 30
 
     def _process_thread(self):
-        self.log('Background Jabber bot thread starting')
-        while self.__running:
+        self.log.info('Background Jabber bot thread starting')
+        while self._running:
             try:
-                self.conn.Process(1)
+                if self.conn.Process(1) is None:
+                    # Process() does not raise IOErrors
+                    # instead it returns None if there is no data
+                    self.log.warning('Link down')
+                    raise IOError
                 self.idle_proc()
             except IOError:
-                self.log('Received IOError while trying to handle incoming messages, trying to reconnect now', logging.WARNING)
-                self.connect()
+                self.conn = None
+                self.log.warning('Received IOError while trying to handle incoming messages, trying to reconnect now')
+                while not self.conn and self._running:
+                    time.sleep(10)
+                    self.conn = self.connect()
+
+            # copy self._unsent, s.t. it doesn't gets an infinite loop
+            # this could happen if we try to send a msg, this fails
+            # and then it gets re-appended to self._unsent -- where we try
+            # to send it again ... and again ... and again...
+            unsent = self._unsent
+            self._unsent = []
+            for msg in unsent:
+                self.send(*msg)
 
     def start_serving(self):
         self.connect()
         if self.conn:
-            self.log('bot connected. serving forever.')
+            self.log.info('bot connected. serving forever.')
         else:
-            self.log('could not connect to server - aborting.', logging.WARNING)
+            self.log.warning('could not connect to server - aborting.')
             return
 
-        self.__running = True
-        self.__thread = threading.Thread(target=self._process_thread)
-        self.__thread.start()
+        self._running = True
+        self._lastping = time.time()
+        self._thread = threading.Thread(target=self._process_thread)
+        self._thread.start()
 
         # this is a hack to get other bots to add this one to their "seen" lists
         # TODO: still doesn't work, figure out how to use JabberBot to get rid of
@@ -175,17 +191,21 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         self.conn.send(xmpp.Presence(to=username))
 
     def stop_serving(self):
-        self.__running = False
-        self.__thread.join()
+        self._running = False
+        self._thread.join()
+
+    def on_ping_timeout(self):
+        raise IOError, "Ping timeout"
 	
-        # override the send method so that connection errors can be handled by trying to reconnect
-        def send(self, user, text, in_reply_to=None, message_type='chat'):
-            try:
-                jabberbot.JabberBot.send(self, user, text, in_reply_to, message_type)
-            except IOError:
-                self.log('Received IOError while trying to send message, trying to reconnect now', logging.WARNING)
-                self.stop_serving()
-                self.start_serving()
+    # override the send method so that connection errors can be handled by trying to reconnect
+    def send(self, user, text, in_reply_to=None, message_type='chat'):
+        try:
+            jabberbot.JabberBot.send(self, user, text, in_reply_to, message_type)
+        except (AttributeError, IOError):
+            if self.conn is not None: # error is something different
+                raise
+            self.log.warning('Received an error while trying to send message. Will send it later.')
+            self._unsent.append((user, text, in_reply_to, message_type))
   
     @botcmd
     def whoami(self, mess, args):
@@ -194,16 +214,16 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
     @botcmd
     def ping(self, mess, args):
-        self.log('Received ping command over Jabber channel')
+        self.log.debug('Received ping command over Jabber channel')
         return 'pong'
         
     @botcmd
     def pushed(self, mess, args):
-        self.log('Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom()))
+        self.log.debug('Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom()))
         if mess.getFrom() == str(self.jid) + '/' + self.res:
-            self.log('Ignoring own pushed message looped back by server')
+            self.log.debug('Ignoring own pushed message looped back by server')
         else:
-            self.log('Trying to pull from %s' % args)
+            self.log.debug('Trying to pull from %s' % args)
             with lock:
                 handler.protected_pull()
 
@@ -538,7 +558,7 @@ if __name__ == '__main__':
             bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
         printmsg('Autosync Jabber login successful', 'Successfully logged into account %s' % username)
     except Exception as e:
-        logging.warning("Exception %s: %s", type(e), e)
+        logging.error("Exception %s: %s", type(e), e)
         printmsg('Autosync Jabber login failed', 'Could not login to Jabber account %s. Will not announce pushes to other running autosync instances.' % username)
 
     wm = pyinotify.WatchManager()
