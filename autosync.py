@@ -169,8 +169,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             # to send it again ... and again ... and again...
             unsent = self._unsent
             self._unsent = []
-            while unsent:
-                msg = unsent.pop()
+            for msg in unsent:
                 self.send(*msg)
 
     def start_serving(self):
