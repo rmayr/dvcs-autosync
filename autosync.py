@@ -256,7 +256,11 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                         cmdarray[i] = parms[j]
                         j=j+1
                     i=i+1 
-            subprocess.call(cmdarray, cwd=self.cwd)
+            try:
+                out = subprocess.check_output(cmdarray, cwd=self.cwd, stderr=subprocess.STDOUT)
+                logging.debug("Command '%s' in '%s'. Output:\n%s" % (" ".join (cmdarray), self.cwd, out))
+            except subprocess.CalledProcessError, e:
+                printmsg('Command failed', "Command '%s' in '%s' failed.  Output:\n%s" % (" ".join (cmdarray), self.cwd, e.output), level=logging.WARNING)
 
     def _post_action_steps(self, curpath = None):
         with lock:
