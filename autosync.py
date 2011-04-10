@@ -446,6 +446,22 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # sequence again
             self.startup()
 
+def config_get (section, option, optional=False):
+    ret = None
+    try:
+        ret = config.get(section, option)
+    except ConfigParser.NoSectionError:
+        if not optional:
+            printmsg ("Configuration error", "Could not load section %s from configuration at %s" % (section, config_locations), level=logging.ERROR)
+            sys.exit(2)
+    except ConfigParser.NoOptionError:
+        if not optional:
+            printmsg ("Configuration error", "Could not load option %s from section %s from configuration at %s" % (option, section, config_lotations), level=logging.ERROR)
+            sys.exit(2)
+    except ConfigParser.ParsingError:
+        printmsg ("Configuration error", "Could not parse configuration at %s" % config_lotations, level=logging.ERROR)
+        sys.exit(2)
+    return ret
 
 def signal_handler(signal, frame):
     logging.info('You pressed Ctrl+C, exiting gracefully!')
@@ -482,11 +498,12 @@ if __name__ == '__main__':
     config = ConfigParser.RawConfigParser()
     defaultcfgpath = os.path.expanduser('~/.autosync')
     if len(sys.argv) >= 2:
-        config.read([sys.argv[1], defaultcfgpath])
+        config_locations = [sys.argv[1], defaultcfgpath]
     else:
-        config.read(defaultcfgpath)
+        config_locations = [defaultcfgpath]
+    config.read(config_locations)
 
-    pathstr = config.get('autosync', 'path')
+    pathstr = config_get('autosync', 'path')
     path = os.path.normpath(os.path.expanduser(pathstr))
     if os.path.isdir(path):
         logging.info('Watching path %s', path)
@@ -494,12 +511,12 @@ if __name__ == '__main__':
         logging.error('path %s (expanded from %s) does not exist', path, pathstr)
         sys.exit(100)
     
-    pidfile = config.get('autosync', 'pidfile')
-    ignorepaths = config.get('autosync', 'ignorepath')
-    readfrequency = int(config.get('autosync', 'readfrequency'))
+    pidfile = config_get('autosync', 'pidfile')
+    ignorepaths = config_get('autosync', 'ignorepath')
+    readfrequency = int(config_get('autosync', 'readfrequency'))
     coalesce_seconds = 2
-    syncmethod = config.get('autosync', 'syncmethod')
-    pulllock = config.get('autosync', 'pulllock')
+    syncmethod = config_get('autosync', 'syncmethod')
+    pulllock = config_get('autosync', 'pulllock')
     if pulllock == 'conservative':
         conservative_pull_lock = True
     elif pulllock == 'optimized':
@@ -511,16 +528,16 @@ if __name__ == '__main__':
         sys.exit(100)
     
     # Read required DVCS commands
-    cmd_status = config.get('dvcs', 'statuscmd')
-    cmd_startup = config.get('dvcs', 'startupcmd')
-    cmd_commit = config.get('dvcs', 'commitcmd')
-    cmd_push = config.get('dvcs', 'pushcmd')
-    cmd_pull = config.get('dvcs', 'pullcmd')
-    cmd_add = config.get('dvcs', 'addcmd')
-    cmd_rm = config.get('dvcs', 'rmcmd')
-    cmd_modify = config.get('dvcs', 'modifycmd')
-    cmd_move = config.get('dvcs', 'movecmd')
-    cmd_remoteurl = config.get('dvcs', 'remoteurlcmd')
+    cmd_status = config_get('dvcs', 'statuscmd')
+    cmd_startup = config_get('dvcs', 'startupcmd')
+    cmd_commit = config_get('dvcs', 'commitcmd')
+    cmd_push = config_get('dvcs', 'pushcmd')
+    cmd_pull = config_get('dvcs', 'pullcmd')
+    cmd_add = config_get('dvcs', 'addcmd')
+    cmd_rm = config_get('dvcs', 'rmcmd')
+    cmd_modify = config_get('dvcs', 'modifycmd')
+    cmd_move = config_get('dvcs', 'movecmd')
+    cmd_remoteurl = config_get('dvcs', 'remoteurlcmd')
     
     # TODO: this is currently git-specific, should be configurable
     ignorefile = os.path.join(path, '.gitignore')
@@ -544,12 +561,9 @@ if __name__ == '__main__':
     signal.signal(signal.SIGINT, signal_handler)
 
 	
-    username = config.get('xmpp', 'username')
-    password = config.get('xmpp', 'password')
-    try:
-        alsonotify = config.get('xmpp', 'alsonotify')
-    except:
-        alsonotify = None
+    username = config_get('xmpp', 'username')
+    password = config_get('xmpp', 'password')
+    alsonotify = config_get('xmpp', 'alsonotify', True)
     hostname = os.uname()[1]
     res = 'AutosyncJabberBot on %s' % hostname
     try:
