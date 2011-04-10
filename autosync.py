@@ -457,13 +457,34 @@ def signal_handler(signal, frame):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    # try to set up desktop notification, first for KDE4, then for Gnome
+    # the signature is not correct, so rely on pynotify only at the moment
+    #try:
+	#import dbus
+	#knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
+	#knotify.event("warning", "autosync application", [],
+	    #'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS',
+	    #[], [], 0, dbus_interface='org.kde.KNotify')
+	#desktopnotifykde = True
+    #except:
+	#print 'KDE4 KNotify does not seem to run or dbus is not installed'
+    try:
+        import pynotify
+        if pynotify.init('autosync application'):
+            logging.info('pynotify initialized successfully, will use desktop notifications')
+            desktopnotifygnome = True
+        else:
+            logging.warning('there was a problem initializing the pynotify module')
+    except:
+        logging.info('pynotify does not seem to be installed')
+
     config = ConfigParser.RawConfigParser()
     defaultcfgpath = os.path.expanduser('~/.autosync')
     if len(sys.argv) >= 2:
         config.read([sys.argv[1], defaultcfgpath])
     else:
         config.read(defaultcfgpath)
-    logging.basicConfig(level=logging.DEBUG)
 
     pathstr = config.get('autosync', 'path')
     path = os.path.normpath(os.path.expanduser(pathstr))
@@ -522,27 +543,6 @@ if __name__ == '__main__':
 
     signal.signal(signal.SIGINT, signal_handler)
 
-    # try to set up desktop notification, first for KDE4, then for Gnome
-    # the signature is not correct, so rely on pynotify only at the moment
-    #try:
-	#import dbus
-	#knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
-	#knotify.event("warning", "autosync application", [],
-	    #'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS', 
-	    #[], [], 0, dbus_interface='org.kde.KNotify')
-	#desktopnotifykde = True
-    #except:
-	#print 'KDE4 KNotify does not seem to run or dbus is not installed'
-    
-    try:
-        import pynotify
-        if pynotify.init('autosync application'):
-            logging.info('pynotify initialized successfully, will use desktop notifications')
-            desktopnotifygnome = True
-        else:
-            logging.warning('there was a problem initializing the pynotify module')
-    except:
-        logging.info('pynotify does not seem to be installed')
 	
     username = config.get('xmpp', 'username')
     password = config.get('xmpp', 'password')
