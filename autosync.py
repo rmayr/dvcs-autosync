@@ -471,7 +471,7 @@ if __name__ == '__main__':
         logging.info('Watching path %s', path)
     else:
         logging.error('path %s (expanded from %s) does not exist', path, pathstr)
-        os.exit(100)
+        sys.exit(100)
     
     pidfile = config.get('autosync', 'pidfile')
     ignorepaths = config.get('autosync', 'ignorepath')
@@ -484,10 +484,10 @@ if __name__ == '__main__':
     elif pulllock == 'optimized':
         conservative_pull_lock = False
         logging.error('Optimized pull strategy not fully implemented yet (event replay queue missing)')
-        os.exit(101)
+        sys.exit(101)
     else:
         logging.error('Unknown pull lock strategy %s, please use either conservative or optimized', pulllock)
-        os.exit(100)
+        sys.exit(100)
     
     # Read required DVCS commands
     cmd_status = config.get('dvcs', 'statuscmd')
