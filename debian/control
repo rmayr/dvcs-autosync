@@ -11,7 +11,7 @@ Vcs-Browser: http://gitorious.org/dvcs-autosync
 Package: dvcs-autosync
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, 
-         python-jabberbot (>= 0.13-1), python-pyinotify
+         python-pyinotify
 Recommends: python-notify
 Description: Automatically synchronize distributed version control repositories
  dvcs-autosync is an open source replacement for Dropbox/Wuala/Box.net/etc. 
