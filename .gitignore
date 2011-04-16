@@ -9,3 +9,4 @@
 *.pyc
 .swp.*
 qt_temp.*
+build

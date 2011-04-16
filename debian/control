@@ -2,25 +2,24 @@ Source: dvcs-autosync
 Section: utils
 Priority: options
 Maintainer: Rene Mayrhofer <rmayr@debian.org>
-Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7.0.50~)
+Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7.0.50~), python-support
 Standards-Version: 3.8.4
 Homepage: http://www.mayrhofer.eu.org/dvcs-autosync
 Vcs-Git: git@gitorious.org:dvcs-autosync/dvcs-autosync.git
 Vcs-Browser: http://gitorious.org/dvcs-autosync
 
 Package: dvcs-autosync
-Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, python-jabberbot (>= 0.13-1),
-         python-pyinotify
+Architecture: all
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, 
+         python-jabberbot (>= 0.13-1), python-pyinotify
 Recommends: python-notify
 Description: Automatically synchronize distributed version control repositories
- dvcs-autosync is a project to create an open source replacement for 
- Dropbox/Wuala/Box.net/etc. based on distributed version control systems 
- (DVCS). It offers nearly instantaneous mutual updates when a file is added 
- or changed on one side but with the added benefit of (local, distributed) 
- versioning and that it does not rely on a centralized service provider, but 
- can be used with any DVCS hosting option including a completely separate 
- server - your data remains your own.
+ dvcs-autosync is an open source replacement for Dropbox/Wuala/Box.net/etc. 
+ based on distributed version control systems (DVCS). It offers nearly 
+ instantaneous mutual updates when a file is added or changed on one side but 
+ with the added benefit of (local, distributed) versioning and that it does 
+ not rely on a centralized service provider, but can be used with any DVCS 
+ hosting option including a completely separate server.
 
  Synchronization of directories is based on DVCS repositories. Git is used for 
  main development and is being tested most thoroughly as the backend storage, 

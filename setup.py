@@ -1,0 +1,49 @@
+#!/usr/bin/python
+# Setup for dvcs-autosync by Rene Mayrhofer
+# Ideas for setup script taken from jabberbot setup.py by Thomas Perl
+
+from distutils.core import setup
+import os
+import re
+import sys
+
+# the package name
+SCRIPT = 'dvcs-autosync'
+
+keys = ('__version__', '__website__', '__license__', '__author__')
+options = dict()
+sc = open(SCRIPT)
+sclines = sc.readlines()
+for line in sclines:
+    if not line.strip(): # skip empty or space padded lines
+	continue
+    if re.compile('^#').search(line) is not None: # skip commented lines
+	continue
+      
+    kvp = line.strip().split('=')
+    if kvp[0].strip() in keys:
+	options[kvp[0].strip(' \'')] = kvp[1].strip(' \'')
+
+# These metadata fields are simply taken from the script
+VERSION = options['__version__']
+WEBSITE = options['__website__']
+LICENSE = options['__license__']
+
+# Extract name and e-mail ("Firstname Lastname <mail@example.org>")
+AUTHOR, EMAIL = re.match(r'(.*) <(.*)>', options['__author__']).groups()
+
+setup(name=SCRIPT,
+      version=VERSION,
+      author=AUTHOR,
+      author_email=EMAIL,
+      license=LICENSE,
+      url=WEBSITE,
+
+      scripts= [SCRIPT],
+      # TODO: remove when we use the upstream Jabberbot
+      data_files = [('/usr/share/' + SCRIPT, ['jabberbot.py'])],
+      
+      description=  'Automatic synchronization of distributed version control repositories',
+      download_url= 'https://gitorious.org/dvcs-autosync',
+      long_description= 'dvcs-autosync is an open source replacement for Dropbox/Wuala/Box.net/etc. based on distributed version control systems (DVCS). It offers nearly instantaneous mutual updates when a file is added or changed on one side but with the added benefit of (local, distributed) versioning and that it does not rely on a centralized service provider, but can be used with any DVCS hosting option including a completely separate server. Synchronization of directories is based on DVCS repositories. Git is used for main development and is being tested most thoroughly as the backend storage, but other DVCS such as Mercurial are also supported. A single Python script monitors the configured directory for live changes, commits these changes to the DVCS (such as git) and synchronizes with other instances using XMPP messages.',
+  )
