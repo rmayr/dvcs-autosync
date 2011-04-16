@@ -189,7 +189,6 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             return
 
         self._running = True
-        self._lastping = time.time()
         self._thread = threading.Thread(target=self._process_thread)
         self._thread.start()
 
