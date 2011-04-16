@@ -20,7 +20,7 @@ Description: Automatically synchronize distributed version control repositories
  with the added benefit of (local, distributed) versioning and that it does 
  not rely on a centralized service provider, but can be used with any DVCS 
  hosting option including a completely separate server.
-
+ .
  Synchronization of directories is based on DVCS repositories. Git is used for 
  main development and is being tested most thoroughly as the backend storage, 
  but other DVCS such as Mercurial are also supported. dvcs-autosync is 
