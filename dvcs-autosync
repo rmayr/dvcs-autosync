@@ -1,13 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# Version 0.3
-#
 # ============================================================================
-# Copyright Rene Mayrhofer, 2010-2011
+# Copyright René Mayrhofer, 2010-2011
 #
 # Contributors:
 # * Dieter Plaetinck: documentation and bug fixes
+# * René 'Necoro' Neumann: improvements for embedded Jabberbot with regards to 
+#   disconnects, bug fixes
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -16,10 +16,18 @@
 
 from __future__ import with_statement
 
+__author__ = 'René Mayrhofer <rene@mayrhofer.eu.org>'
+__version__ = '0.4'
+__website__ = 'http://www.mayrhofer.eu.org/dvcs-autosync'
+__license__ = 'GPL v2 or v3'
+
 import warnings, sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, logging
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore",category=DeprecationWarning)
+    # need to use a private instance of jabberbot for now...
+    # TODO: remove when we no longer need this
+    sys.path.insert(0, '/usr/share/dvcs-autosync')
     import jabberbot, xmpp
 
 botcmd = jabberbot.botcmd

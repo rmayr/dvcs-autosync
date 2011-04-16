@@ -9,3 +9,9 @@
 *.pyc
 .swp.*
 qt_temp.*
+build
+debian/python-module-stampdir/
+debian/files
+debian/dvcs-autosync/
+debian/dvcs-autosync.substvars
+debian/dvcs-autosync.*debhelper*

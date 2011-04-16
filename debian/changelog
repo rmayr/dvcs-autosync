@@ -1,5 +1,5 @@
-dvcs-autosync (0.3-1) unstable; urgency=low
+dvcs-autosync (0.4) unstable; urgency=low
 
   * Initial release (Closes: #nnnn)
 
- -- René Mayrhofer <rmayr@debian.org>  Sat, 19 Mar 2011 22:50:12 +0100
+ -- René Mayrhofer <rmayr@debian.org>  Tue, 5 Apr 2011 22:50:12 +0100
