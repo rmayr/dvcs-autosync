@@ -203,7 +203,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
     def on_ping_timeout(self):
         raise IOError, "Ping timeout"
-	
+
     # override the send method so that connection errors can be handled by trying to reconnect
     def send(self, user, text, in_reply_to=None, message_type='chat'):
         try:
@@ -281,12 +281,12 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # the status command should return 0 when nothing has changed
             retcode = subprocess.call(cmd_status, cwd=self.cwd, shell=True)
             if retcode != 0:
-		if curpath:
-		    commitmsg = 'Autocommit of file %s changed on host %s' % (curpath, hostname)
-		else:
-		    commitmsg = 'Autocommit of all changes since last autosync startup on host %s' % hostname
+                if curpath:
+                    commitmsg = 'Autocommit of file %s changed on host %s' % (curpath, hostname)
+                else:
+                    commitmsg = 'Autocommit of all changes since last autosync startup on host %s' % hostname
                 self._exec_cmd(cmd_commit, [commitmsg])
-	  
+
         if retcode != 0:
             # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
             # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
@@ -409,16 +409,16 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # we don't even have the attribute in the event, so also add
             logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
             self._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
-	    
+
     def timer_tick(self, counter):
         logging.debug('Tick %d / %d' % (counter, self._push_timer.maxtime))
-	
+
     def startup(self):
         with lock:
             logging.info('Running startup command to check for local changes now: %s', cmd_startup)
             self._exec_cmd(cmd_startup)
             self._post_action_steps()
-	    
+
     def _real_push(self, arg):
         printmsg('Pushing changes', 'Pushing last local changes to remote repository')
         with lock:
@@ -429,7 +429,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             # might help
             #self.protected_pull()
             self._exec_cmd(cmd_push)
-	
+
         # and try to notify other instances
         if bot:
             proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
@@ -448,10 +448,10 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         if conservative_pull_lock:
             # conservative strategy: ignore all events from now on
             self._ignore_events = True
-	
+
         with lock:
             handler._exec_cmd(cmd_pull)
-	
+
         if conservative_pull_lock:
             # pull done, now start handling events again
             self._ignore_events = False
@@ -539,14 +539,14 @@ if __name__ == '__main__':
     # try to set up desktop notification, first for KDE4, then for Gnome
     # the signature is not correct, so rely on pynotify only at the moment
     #try:
-	#import dbus
-	#knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
-	#knotify.event("warning", "autosync application", [],
-	    #'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS', 
-	    #[], [], 0, dbus_interface='org.kde.KNotify')
-	#desktopnotifykde = True
+    #import dbus
+    #knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
+    #knotify.event("warning", "autosync application", [],
+        #'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS', 
+        #[], [], 0, dbus_interface='org.kde.KNotify')
+    #desktopnotifykde = True
     #except:
-	#print 'KDE4 KNotify does not seem to run or dbus is not installed'
+    #print 'KDE4 KNotify does not seem to run or dbus is not installed'
     
     try:
         import pynotify
@@ -557,7 +557,7 @@ if __name__ == '__main__':
             logging.warning('there was a problem initializing the pynotify module')
     except:
         logging.info('pynotify does not seem to be installed')
-	
+
     username = config.get('xmpp', 'username')
     password = config.get('xmpp', 'password')
     try:
