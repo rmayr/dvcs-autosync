@@ -21,7 +21,13 @@ __version__ = '0.4'
 __website__ = 'http://www.mayrhofer.eu.org/dvcs-autosync'
 __license__ = 'GPL v2 or v3'
 
-import warnings, sys, signal, os, time, subprocess, threading, fnmatch, pyinotify, ConfigParser, logging
+import warnings, sys, signal, os, time, subprocess, threading, fnmatch, ConfigParser, logging
+
+try:
+    import pyinotify
+    detected_os = "LINUX"
+except:
+    detected_os = "WINDOWS"
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore",category=DeprecationWarning)
@@ -246,219 +252,222 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         do not know the command "Unknown"..."""
         return
 
-class FileChangeHandler(pyinotify.ProcessEvent):
-    def my_init(self, cwd, ignored):
-        self.cwd = cwd
-        self.ignored = ignored
-        # singleton timer for delayed execution of push 
-        self._push_timer = None
-        # When set to true, then all events will be ignored.
-        # This is used to temporarily disable file event handling when a local
-        # pull operation is active.
-        self._ignore_events = False
-        # This is a dictionary of all events that occurred within _coalesce_time seconds.
-        # Elements in the sets are tuples of FIFO lists of event types which were delivered
-        # for the respective file path and timers for handling the file, indexed by the 
-        # respective file path.
-        self._file_events = dict()
-        
-    def _exec_cmd(self, commands, parms = None):
-        for command in commands.split('\n'):
-            cmdarray = command.split(' ')
-            if parms:
-                i = 0
-                j = 0
-                while i < len(cmdarray):
-                    if cmdarray[i] == '%s':
-                        logging.debug('Substituting cmd part %s with %s', cmdarray[i], parms[j])
-                        cmdarray[i] = parms[j]
-                        j=j+1
-                    i=i+1 
-            subprocess.call(cmdarray, cwd=self.cwd)
+if detected_os == "LINUX":
+    class LinuxFileChangeHandler(pyinotify.ProcessEvent):
+        def my_init(self, cwd, ignored):
+            self.cwd = cwd
+            self.ignored = ignored
+            # singleton timer for delayed execution of push 
+            self._push_timer = None
+            # When set to true, then all events will be ignored.
+            # This is used to temporarily disable file event handling when a local
+            # pull operation is active.
+            self._ignore_events = False
+            # This is a dictionary of all events that occurred within _coalesce_time seconds.
+            # Elements in the sets are tuples of FIFO lists of event types which were delivered
+            # for the respective file path and timers for handling the file, indexed by the 
+            # respective file path.
+            self._file_events = dict()
+            
+        def _exec_cmd(self, commands, parms = None):
+            for command in commands.split('\n'):
+                cmdarray = command.split(' ')
+                if parms:
+                    i = 0
+                    j = 0
+                    while i < len(cmdarray):
+                        if cmdarray[i] == '%s':
+                            logging.debug('Substituting cmd part %s with %s', cmdarray[i], parms[j])
+                            cmdarray[i] = parms[j]
+                            j=j+1
+                        i=i+1 
+                subprocess.call(cmdarray, cwd=self.cwd)
 
-    def _post_action_steps(self, curpath = None):
-        with lock:
-            # the status command should return 0 when nothing has changed
-            retcode = subprocess.call(cmd_status, cwd=self.cwd, shell=True)
+        def _post_action_steps(self, curpath = None):
+            with lock:
+                # the status command should return 0 when nothing has changed
+                retcode = subprocess.call(cmd_status, cwd=self.cwd, shell=True)
+                if retcode != 0:
+                    if curpath:
+                        commitmsg = 'Autocommit of file %s changed on host %s' % (curpath, hostname)
+                    else:
+                        commitmsg = 'Autocommit of all changes since last autosync startup on host %s' % hostname
+                    self._exec_cmd(cmd_commit, [commitmsg])
+
             if retcode != 0:
-                if curpath:
-                    commitmsg = 'Autocommit of file %s changed on host %s' % (curpath, hostname)
+                # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
+                # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
+                # then these changes will be pushed in one go
+                if self._push_timer and self._push_timer.is_alive():
+                    logging.debug('Resetting already active push timer to new timeout of %s seconds until push would occur', readfrequency)
+                    self._push_timer.reset()
                 else:
-                    commitmsg = 'Autocommit of all changes since last autosync startup on host %s' % hostname
-                self._exec_cmd(cmd_commit, [commitmsg])
-
-        if retcode != 0:
-            # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
-            # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
-            # then these changes will be pushed in one go
-            if self._push_timer and self._push_timer.is_alive():
-                logging.debug('Resetting already active push timer to new timeout of %s seconds until push would occur', readfrequency)
-                self._push_timer.reset()
+                    logging.debug('Starting push timer with %s seconds until push would occur (if no other changes happen in between)', readfrequency)
+                    self._push_timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
+                    self._push_timer.start()
             else:
-                logging.debug('Starting push timer with %s seconds until push would occur (if no other changes happen in between)', readfrequency)
-                self._push_timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
-                self._push_timer.start()
-        else:
-            logging.debug('Git reported that there is nothing to commit, not touching commit timer')
+                logging.debug('Git reported that there is nothing to commit, not touching commit timer')
 
-    def _queue_action(self, event, action, parms, act_on_dirs=False):
-        curpath = event.pathname
-        if self._ignore_events:
-            logging.debug('Ignoring event %s to %s, it is most probably caused by a remote change being currently pulled', event.maskname, event.pathname)
-            return
-        if event.dir and not act_on_dirs:
-            logging.debug('Ignoring change to directory %s', curpath)
-            return
-        if any(fnmatch.fnmatch(curpath, pattern) for pattern in self.ignored):
-            logging.debug('Ignoring change to file %s because it matches the ignored patterns from .gitignore', curpath)
-            return
+        def _queue_action(self, event, action, parms, act_on_dirs=False):
+            curpath = event.pathname
+            if self._ignore_events:
+                logging.debug('Ignoring event %s to %s, it is most probably caused by a remote change being currently pulled', event.maskname, event.pathname)
+                return
+            if event.dir and not act_on_dirs:
+                logging.debug('Ignoring change to directory %s', curpath)
+                return
+            if any(fnmatch.fnmatch(curpath, pattern) for pattern in self.ignored):
+                logging.debug('Ignoring change to file %s because it matches the ignored patterns from .gitignore', curpath)
+                return
 
-        # remember the event for this file, but don't act on it immediately
-        # this allows e.g. a file that has just been removed and re-created
-        # immediately afterwards (as many editors do) to be recorded just as
-        # being modified
-        with lock:
-            # each entry in the dict is a tuple of the list of events and a timer
-            if not self._file_events.has_key(curpath):
-                self._file_events[curpath] = [list(), None]
-            # and each entry in the list is a tuple of event name and associated action
-            self._file_events[curpath][0].append((event.maskname, action))
-            if self._file_events[curpath][1] and self._file_events[curpath][1].is_alive():
-                logging.debug('Resetting already active coalesce timer to new timeout of %s seconds until coalescing events for file %s would occur', coalesce_seconds, curpath)
-                self._file_events[curpath][1].reset()
-            else:
-                logging.debug('Starting coalesce timer with %s seconds until coalescing events for file %s would occur (if no other changes happen in between)', coalesce_seconds, curpath)
-                self._file_events[curpath][1] = ResettableTimer(maxtime=coalesce_seconds, expire=self._filter_and_handle_actions, inc=1, arg=[curpath, parms])
-                self._file_events[curpath][1].start()
-            
-    def _filter_and_handle_actions(self, args):
-        curpath = args[0]
-        parms = args[1]
-            
-        logging.info('Coalesce event triggered for file %s', curpath)
-        with lock:
-            logging.debug('Considering file %s, which has the following events recorded:', curpath)
-            events, timer = self._file_events[curpath]
-            lastevent = None
-            lastaction = None
-            for eventtype, action in events:
-                logging.debug('   Event type=%s, action=%s', eventtype, action)
+            # remember the event for this file, but don't act on it immediately
+            # this allows e.g. a file that has just been removed and re-created
+            # immediately afterwards (as many editors do) to be recorded just as
+            # being modified
+            with lock:
+                # each entry in the dict is a tuple of the list of events and a timer
+                if not self._file_events.has_key(curpath):
+                    self._file_events[curpath] = [list(), None]
+                # and each entry in the list is a tuple of event name and associated action
+                self._file_events[curpath][0].append((event.maskname, action))
+                if self._file_events[curpath][1] and self._file_events[curpath][1].is_alive():
+                    logging.debug('Resetting already active coalesce timer to new timeout of %s seconds until coalescing events for file %s would occur', coalesce_seconds, curpath)
+                    self._file_events[curpath][1].reset()
+                else:
+                    logging.debug('Starting coalesce timer with %s seconds until coalescing events for file %s would occur (if no other changes happen in between)', coalesce_seconds, curpath)
+                    self._file_events[curpath][1] = ResettableTimer(maxtime=coalesce_seconds, expire=self._filter_and_handle_actions, inc=1, arg=[curpath, parms])
+                    self._file_events[curpath][1].start()
                 
-                if not lastevent:
-                    lastevent = eventtype
-                    lastaction = action
+        def _filter_and_handle_actions(self, args):
+            curpath = args[0]
+            parms = args[1]
                 
-                # prio 1: add
-                # prio 2: move
-                # prio 3: modify
-                # prio 4: rm
-                # special case: rm then add --> modify
-                if lastevent == 'IN_DELETE' and eventtype == 'IN_CREATE':
-                    lastevent = 'IN_MODIFY'
-                    lastaction = cmd_modify
-                    break
+            logging.info('Coalesce event triggered for file %s', curpath)
+            with lock:
+                logging.debug('Considering file %s, which has the following events recorded:', curpath)
+                events, timer = self._file_events[curpath]
+                lastevent = None
+                lastaction = None
+                for eventtype, action in events:
+                    logging.debug('   Event type=%s, action=%s', eventtype, action)
+                    
+                    if not lastevent:
+                        lastevent = eventtype
+                        lastaction = action
+                    
+                    # prio 1: add
+                    # prio 2: move
+                    # prio 3: modify
+                    # prio 4: rm
+                    # special case: rm then add --> modify
+                    if lastevent == 'IN_DELETE' and eventtype == 'IN_CREATE':
+                        lastevent = 'IN_MODIFY'
+                        lastaction = cmd_modify
+                        break
+                    
+                    # priority ordering 
+                    if lastevent == 'IN_MODIFY' and eventtype == 'IN_CREATE':
+                        lastevent = eventtype
+                        lastaction = action
+                    if lastevent == 'IN_DELETE' and eventtype == 'IN_MODIFY':
+                        lastevent = eventtype
+                        lastaction = action
+
+                logging.info('Final action for file %s: type=%s, action=%s', curpath, lastevent, lastaction)
+
+                # and clear again for next events coalescing
+                del self._file_events[curpath]
                 
-                # priority ordering 
-                if lastevent == 'IN_MODIFY' and eventtype == 'IN_CREATE':
-                    lastevent = eventtype
-                    lastaction = action
-                if lastevent == 'IN_DELETE' and eventtype == 'IN_MODIFY':
-                    lastevent = eventtype
-                    lastaction = action
+                printmsg('Local change', 'Committing changes in %s: %s' % (curpath, lastaction))
+        
+                self._exec_cmd(lastaction, parms)
+                self._post_action_steps(curpath)
+                
 
-            logging.info('Final action for file %s: type=%s, action=%s', curpath, lastevent, lastaction)
+        def process_IN_DELETE(self, event):
+            # sanity check - don't remove file if it still exists in the file system!
+            if os.path.exists(event.pathname):
+                logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
+                return
+             
+            self._queue_action(event, cmd_rm, [event.pathname])
 
-            # and clear again for next events coalescing
-            del self._file_events[curpath]
-            
-            printmsg('Local change', 'Committing changes in %s: %s' % (curpath, lastaction))
-    
-            self._exec_cmd(lastaction, parms)
-            self._post_action_steps(curpath)
-            
+        def process_IN_CREATE(self, event):
+            self._queue_action(event, cmd_add, [event.pathname])
 
-    def process_IN_DELETE(self, event):
-        # sanity check - don't remove file if it still exists in the file system!
-        if os.path.exists(event.pathname):
-            logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
-            return
-         
-        self._queue_action(event, cmd_rm, [event.pathname])
+        def process_IN_MODIFY(self, event):
+            self._queue_action(event, cmd_modify, [event.pathname])
 
-    def process_IN_CREATE(self, event):
-        self._queue_action(event, cmd_add, [event.pathname])
+        def process_IN_CLOSE_WRITE(self, event):
+            self._queue_action(event, cmd_modify, [event.pathname])
 
-    def process_IN_MODIFY(self, event):
-        self._queue_action(event, cmd_modify, [event.pathname])
+        def process_IN_ATTRIB(self, event):
+            self._queue_action(event, cmd_modify, [event.pathname])
 
-    def process_IN_CLOSE_WRITE(self, event):
-        self._queue_action(event, cmd_modify, [event.pathname])
-
-    def process_IN_ATTRIB(self, event):
-        self._queue_action(event, cmd_modify, [event.pathname])
-
-    def process_IN_MOVED_TO(self, event):
-        try:
-            if event.src_pathname:
-                logging.debug('Detected moved file from %s to %s', event.src_pathname, event.pathname)
-                self._queue_action(event, cmd_move, [event.src_pathname, event.pathname], act_on_dirs=True)
-            else:
+        def process_IN_MOVED_TO(self, event):
+            try:
+                if event.src_pathname:
+                    logging.debug('Detected moved file from %s to %s', event.src_pathname, event.pathname)
+                    self._queue_action(event, cmd_move, [event.src_pathname, event.pathname], act_on_dirs=True)
+                else:
+                    logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
+                    self._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
+            except AttributeError:
+                # we don't even have the attribute in the event, so also add
                 logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
                 self._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
-        except AttributeError:
-            # we don't even have the attribute in the event, so also add
-            logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
-            self._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
 
-    def timer_tick(self, counter):
-        logging.debug('Tick %d / %d' % (counter, self._push_timer.maxtime))
+        def timer_tick(self, counter):
+            logging.debug('Tick %d / %d' % (counter, self._push_timer.maxtime))
 
-    def startup(self):
-        with lock:
-            logging.info('Running startup command to check for local changes now: %s', cmd_startup)
-            self._exec_cmd(cmd_startup)
-            self._post_action_steps()
+        def startup(self):
+            with lock:
+                logging.info('Running startup command to check for local changes now: %s', cmd_startup)
+                self._exec_cmd(cmd_startup)
+                self._post_action_steps()
 
-    def _real_push(self, arg):
-        printmsg('Pushing changes', 'Pushing last local changes to remote repository')
-        with lock:
-            # TODO: check if we actually need a pull or a check-for-pull here 
-            # or if all race conditions were already ruled out
-            # if we need a check-for-pull, then something like 
-            #    git fetch --dry-run | grep "Unpacking objects:
-            # might help
-            #self.protected_pull()
-            self._exec_cmd(cmd_push)
+        def _real_push(self, arg):
+            printmsg('Pushing changes', 'Pushing last local changes to remote repository')
+            with lock:
+                # TODO: check if we actually need a pull or a check-for-pull here 
+                # or if all race conditions were already ruled out
+                # if we need a check-for-pull, then something like 
+                #    git fetch --dry-run | grep "Unpacking objects:
+                # might help
+                #self.protected_pull()
+                self._exec_cmd(cmd_push)
 
-        # and try to notify other instances
-        if bot:
-            proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
-            (remoteurl, errors) = proc.communicate()
-            for sendto in [username, alsonotify]:
-                if sendto:
-                    bot.send(sendto, 'pushed %s' % remoteurl)
+            # and try to notify other instances
+            if bot:
+                proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
+                (remoteurl, errors) = proc.communicate()
+                for sendto in [username, alsonotify]:
+                    if sendto:
+                        bot.send(sendto, 'pushed %s' % remoteurl)
 
-    def protected_pull(self):
-        printmsg('Pulling changes', 'Pulling changes from remote repository')
-        # need to handle file change notification while applying remote
-        # changes caused by the pull: either conservative (ignore all
-        # file notifications while the pull is running) or optimized (replay the
-        # file changes that were seen during the pull after it has finished)
+        def protected_pull(self):
+            printmsg('Pulling changes', 'Pulling changes from remote repository')
+            # need to handle file change notification while applying remote
+            # changes caused by the pull: either conservative (ignore all
+            # file notifications while the pull is running) or optimized (replay the
+            # file changes that were seen during the pull after it has finished)
 
-        if conservative_pull_lock:
-            # conservative strategy: ignore all events from now on
-            self._ignore_events = True
+            if conservative_pull_lock:
+                # conservative strategy: ignore all events from now on
+                self._ignore_events = True
 
-        with lock:
-            handler._exec_cmd(cmd_pull)
+            with lock:
+                handler._exec_cmd(cmd_pull)
 
-        if conservative_pull_lock:
-            # pull done, now start handling events again
-            self._ignore_events = False
-            # and handle those local changes that might have happened while the
-            # pull ran and we weren't listening by simply doing the startup 
-            # sequence again
-            self.startup()
+            if conservative_pull_lock:
+                # pull done, now start handling events again
+                self._ignore_events = False
+                # and handle those local changes that might have happened while the
+                # pull ran and we weren't listening by simply doing the startup 
+                # sequence again
+                self.startup()
+else: #detected_os == LINUX
+    pass #TODO
 
 
 def signal_handler(signal, frame):
@@ -468,6 +477,29 @@ def signal_handler(signal, frame):
     if bot:
         bot.stop_serving()
     sys.exit(0)
+
+def initialize_inotify():
+    excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
+    wm = pyinotify.WatchManager()
+    handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
+    # TODO: frequency doesn't work....
+    notifier = pyinotify.ThreadedNotifier(wm, handler, read_freq=readfrequency)
+    #notifier = pyinotify.ThreadedNotifier(wm, handler)
+    # coalescing events needs pyinotify >= 0.9, so make this optional
+    try:
+        notifier.coalesce_events()
+    except AttributeError as e:
+        logging.warning('Cannot coalesce events, pyinotify does not seem to support it (maybe too old): %s', e)
+    mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
+    try:
+        logging.debug('Adding recursive, auto-adding watch for path %s with event mask %d', path, mask)
+        wd = wm.add_watch(path, mask, rec=True, auto_add=True, quiet=False, exclude_filter=excl)
+        if wd <= 0:
+            logging.warning('Unable to add watch for path %s - this will not work', path)
+    except pyinotify.WatchManagerError, e:
+        logging.warning("pyinotify.WatchManagerError: %s, %s", e, e.wmd)
+
+    return (notifier, handler)
 
 
 if __name__ == '__main__':
@@ -532,7 +564,6 @@ if __name__ == '__main__':
     # absolute path names.
     ignoreabsolutepaths = [os.path.normpath(path + os.sep + ignorepath) for ignorepath in ignorepaths.split()]
     logging.info('Adding list to inotify exclude filter: %s', ignoreabsolutepaths)
-    excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
 
     signal.signal(signal.SIGINT, signal_handler)
 
@@ -564,7 +595,12 @@ if __name__ == '__main__':
         alsonotify = config.get('xmpp', 'alsonotify')
     except:
         alsonotify = None
-    hostname = os.uname()[1]
+
+    if detected_os == "LINUX":
+        hostname = os.uname()[1]
+    else:
+        hostname = "TODO"
+
     res = 'AutosyncJabberBot on %s' % hostname
     try:
         with warnings.catch_warnings():
@@ -579,34 +615,24 @@ if __name__ == '__main__':
         logging.error("Exception %s: %s", type(e), e)
         printmsg('Autosync Jabber login failed', 'Could not login to Jabber account %s. Will not announce pushes to other running autosync instances.' % username)
 
-    wm = pyinotify.WatchManager()
-    handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
-    # TODO: frequency doesn't work....
-    notifier = pyinotify.ThreadedNotifier(wm, handler, read_freq=readfrequency)
-    #notifier = pyinotify.ThreadedNotifier(wm, handler)
-    # coalescing events needs pyinotify >= 0.9, so make this optional
-    try:
-        notifier.coalesce_events()
-    except AttributeError as e:
-        logging.warning('Cannot coalesce events, pyinotify does not seem to support it (maybe too old): %s', e)
-    mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
-    try:
-        logging.debug('Adding recursive, auto-adding watch for path %s with event mask %d', path, mask)
-        wd = wm.add_watch(path, mask, rec=True, auto_add=True, quiet=False, exclude_filter=excl)
-        if wd <= 0:
-            logging.warning('Unable to add watch for path %s - this will not work', path)
-    except pyinotify.WatchManagerError, e:
-        logging.warning("pyinotify.WatchManagerError: %s, %s", e, e.wmd)
-
     printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
-    
+
+    if detected_os == "LINUX":
+        notifier,handler = initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfrequency)
+    else:
+        pass #TODO
+
     # this is a central lock for guarding repository operations
     lock = threading.RLock()
 
     logging.info('Start monitoring %s (type c^c to exit)', path)
-    # TODO: daemonize
-    # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
-    notifier.start()
+    if detected_os == "LINUX":
+        # TODO: daemonize
+        # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
+        notifier.start()
+    else:
+        pass #TODO
+
     logging.info('Executing startup synchronizaion')
     handler.protected_pull()
     if not conservative_pull_lock:
