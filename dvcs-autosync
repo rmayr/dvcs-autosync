@@ -263,6 +263,13 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         """The bot sends a "login" message first. ignore it"""
         return
 
+    @botcmd
+    def unknown(self, mess, args):
+        """Should somebody say something that is not a command, all bots will
+        reply with "Unknown command...." to which all bots will reply that thay
+        do not know the command "Unknown"..."""
+        return
+
 class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
         self.cwd = cwd
