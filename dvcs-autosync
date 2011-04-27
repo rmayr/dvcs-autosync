@@ -151,7 +151,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
     def __init__(self, username, password, res=None, debug=False, ignoreownmsg=True):
         self._running = False
         self._unsent = []
-        jabberbot.JabberBot.__init__(self, username, password, res, debug, ignoreownmsg)
+        jabberbot.JabberBot.__init__(self, username, password, res, debug, False, not ignoreownmsg)
         self.PING_FREQUENCY = 30
 
     def _process_thread(self):
