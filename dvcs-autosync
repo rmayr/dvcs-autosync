@@ -479,7 +479,7 @@ def signal_handler(signal, frame):
         bot.stop_serving()
     sys.exit(0)
 
-def initialize_inotify():
+def initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfrequency):
     excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
     wm = pyinotify.WatchManager()
     handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
