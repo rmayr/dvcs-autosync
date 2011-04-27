@@ -27,6 +27,7 @@ try:
     import pyinotify
     detected_os = "LINUX"
 except:
+    import win32api
     detected_os = "WINDOWS"
 
 with warnings.catch_warnings():
@@ -598,8 +599,10 @@ if __name__ == '__main__':
 
     if detected_os == "LINUX":
         hostname = os.uname()[1]
+    elif detected_os == "WINDOWS":
+        hostname = win32api.GetComputerName()
     else:
-        hostname = "TODO"
+        hostname = "UNSUPPORTED_OS"
 
     res = 'AutosyncJabberBot on %s' % hostname
     try:
