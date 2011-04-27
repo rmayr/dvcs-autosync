@@ -234,6 +234,10 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             with lock:
                 handler.protected_pull()
 
+    @botcmd
+    def login(self, mess, args):
+        """The bot sends a "login" message first. ignore it"""
+        return
 
 class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
