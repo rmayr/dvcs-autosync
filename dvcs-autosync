@@ -482,7 +482,7 @@ def signal_handler(signal, frame):
 def initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfrequency):
     excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
     wm = pyinotify.WatchManager()
-    handler = FileChangeHandler(cwd=path, ignored=ignorefilepatterns)
+    handler = LinuxFileChangeHandler(cwd=path, ignored=ignorefilepatterns)
     # TODO: frequency doesn't work....
     notifier = pyinotify.ThreadedNotifier(wm, handler, read_freq=readfrequency)
     #notifier = pyinotify.ThreadedNotifier(wm, handler)
