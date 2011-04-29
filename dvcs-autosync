@@ -48,11 +48,6 @@ bot = None
 hostname = None
 
 def printmsg(title, msg, level=logging.INFO):
-    urgencies = {logging.DEBUG: pynotify.URGENCY_LOW,
-                 logging.INFO: pynotify.URGENCY_NORMAL,
-                 logging.WARNING: pynotify.URGENCY_CRITICAL,
-                 logging.ERROR: pynotify.URGENCY_CRITICAL,
-                 logging.CRITICAL: pynotify.URGENCY_CRITICAL}
     # there are probably more levels but I couldn't find the appropriate docs
     kdelevels = {logging.DEBUG: 'info',
                  logging.INFO: 'info',
@@ -60,6 +55,11 @@ def printmsg(title, msg, level=logging.INFO):
                  logging.ERROR: 'warning',
                  logging.CRITICAL: 'warning'}
     try:
+        urgencies = {logging.DEBUG: pynotify.URGENCY_LOW,
+                     logging.INFO: pynotify.URGENCY_NORMAL,
+                     logging.WARNING: pynotify.URGENCY_CRITICAL,
+                     logging.ERROR: pynotify.URGENCY_CRITICAL,
+                     logging.CRITICAL: pynotify.URGENCY_CRITICAL}
         if desktopnotifygnome:
             n = pynotify.Notification(title, msg)
             n.set_urgency(urgencies[level])
