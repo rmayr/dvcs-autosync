@@ -1,0 +1,90 @@
+[autosync]
+path = ~/Desktop/splashbin
+pidfile = ~/.autosync.pid
+syncmethod = xmpp
+#syncmethod = autosync-server
+
+# There are currently two options for handling file notifications, as neither 
+# one is perfect. You can choose between the 'conservative' option, which is
+# slower but should work in every corner case, and the 'optimized' option, 
+# which will consume less CPU and I/O resources on a remotely-triggered pull,
+# but may miss local changes until the next time autosync is restarted or a
+# manual commit is done on the repository.
+#
+# The problem is that during a pull from the remote repository, changes will
+# be applied to the local file system and consequently generate file-changed
+# events. These events are in turn translated to add/remove/move commands for
+# the DVCS, which would duplicate the remote changes locally in the history and
+# obviously doesn't work e.g. for file removes. Therefore, the file/dir changes
+# caused by a remote pull must not be translated to local DVCS changes.
+# The conservative strategy solves this problem by completely suspending event
+# handling while the pull is active. Because it is possible that _real_ local
+# changes occur concurrently to the pull, the startup command will be run after
+# the pull has been finished and event processing was resumed again. This is a
+# safe option, as all local changes that occurred before or during the pull
+# will be picked up by the DVCS client. However, when no local changes occurred
+# (which is more probable), then this strategy causes unnecessary I/O overhead.
+#
+# The optimized strategy also suspends the execution of local DVCS actions 
+# triggered by file/directory events during the pull, but does not completely
+# discard them. Instead, all events that occurred during the pull are recorded
+# in an event queue which is replayed after the pull has finished. The 
+# advantage is that a complete re-scan of the local repository is avoided and
+# only those files/directories that saw some modification are re-checked for 
+# local changes. The disadvantage is that this depends more strongly on the
+# change detection capabilities (trivial ones done by autosync-dvcs and more
+# complex ones done by the respective DVCS client) and it is therefore not 
+# guaranteed that all local, concurrent changes are being detected. This option
+# is still being evaluated for corner cases where it doesn't work, and 
+# therefore is not yet the default strategy.
+pulllock = conservative
+#pulllock = optimized
+
+# The number of seconds to wait for additional events before acting. Setting 
+# this lower will increase the synchronization speed at the cost of CPU and
+# transfer resources.
+readfrequency = 5
+ignorepath = .git
+
+# Note: addcmd, rmcmd, and modifycmd take one argument, movecmd takes two (first the source, then the destination).
+# Note: statuscmd should return with code 0 when nothing has changed in the 
+# Note: commitcmd also takes one argument, which will be substituted by a generated commit message.
+# local checked-out tree that needs to be committed and non-zero when a commit
+# is required.
+[dvcs]
+# for git
+statuscmd = git.cmd status | find /I "nothing to commit"
+addcmd = git.cmd add %s
+rmcmd = git.cmd rm %s
+modifycmd = git.cmd add %s
+# doesn't work when the source file no longer exists, git expects to move it itself
+#movecmd = git mv %s %s
+# use this instead, git will figure out that it was a move because the file is similar
+movecmd = git.cmd rm %s 
+    git.cmd add %s
+startupcmd = git.cmd add -A
+commitcmd = git.cmd commit -m %s
+pushcmd = git.cmd push
+pullcmd = git.cmd pull
+remoteurlcmd = git.cmd config --get remote.origin.url
+
+# for mercurial
+#statuscmd = hg status
+#addcmd = hg add
+#rmcmd = hg remove
+#modifycmd = 
+#movecmd = hg mv %s %s
+#startupcmd = hg addremove
+#commitcmd = hg commit -m %s
+#pushcmd = hg push
+#pullcmd = hg pull -u
+
+[xmpp]
+username = ascii158-autosync@jabber.org
+password = computer
+alsonotify =
+
+[autosync-server]
+server = http://whatever.sync.server
+username = your-username
+password = your-password
