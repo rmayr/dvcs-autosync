@@ -21,7 +21,7 @@ __version__ = '0.4'
 __website__ = 'http://www.mayrhofer.eu.org/dvcs-autosync'
 __license__ = 'GPL v2 or v3'
 
-import warnings, sys, signal, os, time, subprocess, threading, fnmatch, ConfigParser, logging
+import warnings, sys, signal, os, time, subprocess, threading, fnmatch, ConfigParser, logging, threading
 
 try:
     import pyinotify
@@ -476,9 +476,18 @@ if detected_os == "LINUX":
                 logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
                 self.handler._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
 
-else: #detected_os == LINUX
-    pass #TODO
+class WindowsFileChangeHandlerAdapter(threading.Thread):
+    def __init__(self, handler):
+        threading.Thread.__init__(self)
+        pass
 
+    def run(self):
+        pass
+
+def initialize_win32notify(handler):
+    adapter = WindowsFileChangeHandlerAdapter(handler)
+    adapter.daemon = True
+    adapter.start()
 
 def signal_handler(signal, frame):
     logging.info('You pressed Ctrl+C, exiting gracefully!')
@@ -638,6 +647,8 @@ if __name__ == '__main__':
 
     if detected_os == "LINUX":
         initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfrequency, handler)
+    elif detected_os == "WINDOWS":
+        initialize_win32notify(handler)
     else:
         pass #TODO
 
