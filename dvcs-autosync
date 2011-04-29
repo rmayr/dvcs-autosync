@@ -435,6 +435,8 @@ class FileChangeHandler():
             self.startup()
 
 
+# The definition of this class has to be OS arbitrated because pyinotify can't be
+# imported under windows and inheriting from pyinotify.ProcessEvent needs it...
 if detected_os == "LINUX":
     class LinuxFileChangeHandlerAdapter(pyinotify.ProcessEvent):
         def my_init(self, handler):
