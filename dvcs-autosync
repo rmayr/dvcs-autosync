@@ -197,6 +197,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
         self._running = True
         self._thread = threading.Thread(target=self._process_thread)
+        self._thread.daemon = True
         self._thread.start()
 
         # this is a hack to get other bots to add this one to their "seen" lists
