@@ -1,6 +1,6 @@
 Source: dvcs-autosync
 Section: utils
-Priority: options
+Priority: optional
 Maintainer: Rene Mayrhofer <rmayr@debian.org>
 Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7.0.50~), python-support
 Standards-Version: 3.8.4
