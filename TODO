@@ -20,6 +20,7 @@ TODO - future versions:
 -----------------------
 * automatically add some context to commit messages (e.g. location, applications open at the same time, etc.)
 * allow to specify a commit/change message via traybar icon/popup message, maybe even in retrospect (rewriting history before pushing with a longer push delay)
+* integrate with git-annex to support keeping large binary files in synchronized directories without unnecessarily increasing repository size by keeping their history
 
 Ideas:
 ------

@@ -91,6 +91,13 @@ Potential pitfalls
   fs.inotify.max_user_watches and increasing it to a sufficient value
   (e.g. 500000).
 
+ * Note that, when keeping changing media files (or other large binaries) in 
+   an automatically synchronized repository, it may grow quickly. In the
+   current version, dvcs-autosync will never delete any history and keep all
+   previous versions. This is intentional for documents and text files, but may
+   be problematic for large binaries. I will try to address this problem in 
+   future versions, e.g. by integrating with git-annex (see TODO).
+
 Thoughts that should be considered at some point but have not yet been implemented:
 ------------------------
 - The XMPP push message already contains a parameter, namely the repository the push went to. Add another parameter to specify the repository in which the change happened so that others can try to pull directly from there, in case it is quicker. The main use case for this optimization is my standard one: the laptop sitting next to the desktop and both of them syncing each other's home directories. Going via the main, hosted server is quite a bit more inefficient than pulling via 1GB/s LAN....
