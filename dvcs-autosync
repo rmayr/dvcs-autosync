@@ -380,6 +380,11 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         self._queue_action(event, cmd_rm, [event.pathname])
 
     def process_IN_CREATE(self, event):
+        # sanity check - don't add file if it (no longer) exists in the file system!
+        if not os.path.exists(event.pathname):
+            logging.debug('Ignoring file create event on %s, as it (no longer) exists - it was probably created as a temporary file and immediately removed by the application', event.pathname)
+            return
+            
         self._queue_action(event, cmd_add, [event.pathname])
 
     def process_IN_MODIFY(self, event):
