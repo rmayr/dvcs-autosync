@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=DVCS-Autosync
+GenericName=File Synchronizer based on Distributed Version Control
+Comment=Synchronize and version your files across multiple computers with distributed version control (by default with Git)
+Exec=/usr/share/dvcs-autosync/autosync-xdg-launcher.sh
+Terminal=false
+Type=Application
+Icon=emblem-synchronizing
+Categories=Network;FileTransfer;
+StartupNotify=false
