@@ -5,6 +5,6 @@ Comment=Synchronize and version your files across multiple computers with distri
 Exec=/usr/share/dvcs-autosync/autosync-xdg-launcher.sh
 Terminal=false
 Type=Application
-Icon=emblem-synchronizing
+Icon=dvcs-autosync
 Categories=Network;FileTransfer;
 StartupNotify=false
