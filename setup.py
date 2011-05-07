@@ -41,7 +41,13 @@ setup(name=SCRIPT,
 
       scripts= [SCRIPT],
       # TODO: remove when we use the upstream Jabberbot
-      data_files = [('/usr/share/' + SCRIPT, ['jabberbot.py'])],
+      data_files = [('/usr/share/' + SCRIPT, ['jabberbot.py', 'autosync-xdg-launcher.sh']),
+                    ('/usr/share/applications', [SCRIPT + '.desktop']),
+                    ('/usr/share/icons/hicolor/8x8/apps', ['icons/8x8/dvcs-autosync.png']),
+                    ('/usr/share/icons/hicolor/16x16/apps', ['icons/16x16/dvcs-autosync.png']),
+                    ('/usr/share/icons/hicolor/22x22/apps', ['icons/22x22/dvcs-autosync.png']),
+                    ('/usr/share/icons/hicolor/32x32/apps', ['icons/32x32/dvcs-autosync.png']),
+                    ('/usr/share/icons/hicolor/48x48/apps', ['icons/48x48/dvcs-autosync.png'])],
       
       description=  'Automatic synchronization of distributed version control repositories',
       download_url= 'https://gitorious.org/dvcs-autosync',
