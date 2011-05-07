@@ -1,8 +1,14 @@
 [autosync]
 path = ~/amw
 pidfile = ~/.autosync.pid
-syncmethod = xmpp
+# Available synchronization methods: "xmpp" and "none", "autosync-server"
+# may be implemented later (to potentially be interoperable with SparkleShare).
+# If xmpp is set as synchronization method, a config section [xmpp] with at 
+# least two config variables username and password must exist, otherwise 
+# dvcs-autosync will fail to start.
+#syncmethod = none
 #syncmethod = autosync-server
+syncmethod = xmpp
 
 # There are currently two options for handling file notifications, as neither 
 # one is perfect. You can choose between the 'conservative' option, which is
