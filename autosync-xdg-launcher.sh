@@ -6,6 +6,6 @@ data=${XDG_DATA_HOME:-$HOME/.local/share}/autosync
 mkdir -p $data/log
 for i in $conf/*
 do
-    pkill -f "python.*autosync.py .*autosync/$(basename $i)"
-    autosync.py $i &> $data/log/$(basename $i).$(date '+%F-%T').log &
+    pkill -f "python.*dvcs-autosync .*autosync/$(basename $i)"
+    dvcs-autosync $i &> $data/log/$(basename $i).$(date '+%F-%T').log &
 done
