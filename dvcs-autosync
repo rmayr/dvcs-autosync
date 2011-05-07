@@ -5,7 +5,8 @@
 # Copyright René Mayrhofer, 2010-2011
 #
 # Contributors:
-# * Dieter Plaetinck: documentation and bug fixes
+# * Dieter Plaetinck: documentation and bug fixes, launcher script, config
+#   handling improvements
 # * René 'Necoro' Neumann: improvements for embedded Jabberbot with regards to 
 #   disconnects, bug fixes
 #

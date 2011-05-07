@@ -1,5 +1,5 @@
 dvcs-autosync (0.4) unstable; urgency=low
 
-  * Initial release (Closes: #nnnn)
+  * Initial release (Closes: #620962: ITP: dvcs-autosync)
 
  -- René Mayrhofer <rmayr@debian.org>  Tue, 5 Apr 2011 22:50:12 +0100
