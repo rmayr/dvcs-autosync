@@ -376,7 +376,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         if os.path.exists(event.pathname):
             logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
             return
-         
+
         self._queue_action(event, cmd_rm, [event.pathname])
 
     def process_IN_CREATE(self, event):
@@ -384,7 +384,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         if not os.path.exists(event.pathname):
             logging.debug('Ignoring file create event on %s, as it (no longer) exists - it was probably created as a temporary file and immediately removed by the application', event.pathname)
             return
-            
+
         self._queue_action(event, cmd_add, [event.pathname])
 
     def process_IN_MODIFY(self, event):
@@ -594,6 +594,8 @@ if __name__ == '__main__':
     elif syncmethod == 'autosync-server':
         logging.error('Alternative autosync-server sync method not fully implemented yet')
         sys.exit(101)
+    elif syncmethod == 'none':
+	logging.info('Synchronization method none configured, will not attempt to synchronize with any repository')
     else:
 	printmsg('No synchronization method configured', 'No or unknown syncmethod configured, will not attempt to synchronize with any repository', level=logging.WARNING)
 
