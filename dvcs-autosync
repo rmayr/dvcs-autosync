@@ -36,6 +36,7 @@ botcmd = jabberbot.botcmd
 # some global variables, will be initialized in main
 desktopnotifykde = False
 desktopnotifygnome = False
+xmppnotify = False
 knotify = None
 notifier = None
 bot = None
@@ -60,6 +61,9 @@ def printmsg(title, msg, level=logging.INFO):
             n.show()
         elif desktopnotifykde:
             knotify.event(kdelevels[level], 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
+            
+        if xmppnotify and bot and alsonotify:
+	    bot.send(alsonotify, '[%s]: %s' % (title, msg))
     except:
         pass
     logging.log(level, "NOTIFICATION: %s: %s" % (title, msg))
@@ -419,7 +423,10 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             self._post_action_steps()
 	    
     def _real_push(self, arg):
-        printmsg('Pushing changes', 'Pushing last local changes to remote repository')
+        proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
+        (remoteurl, errors) = proc.communicate()
+        printmsg('Pushing changes', 'Pushing last local changes to remote repository %s', remoteurl)
+        
         with lock:
             # TODO: check if we actually need a pull or a check-for-pull here 
             # or if all race conditions were already ruled out
@@ -430,12 +437,8 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             self._exec_cmd(cmd_push)
 	
         # and try to notify other instances
-        if bot:
-            proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
-            (remoteurl, errors) = proc.communicate()
-            for sendto in [username, alsonotify]:
-                if sendto:
-                    bot.send(sendto, 'pushed %s' % remoteurl)
+        if bot and sendto:
+            bot.send(sendto, 'pushed %s' % remoteurl)
 
     def protected_pull(self):
         printmsg('Pulling changes', 'Pulling changes from remote repository')
@@ -487,6 +490,7 @@ def signal_handler(signal, frame):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
+    
     # try to set up desktop notification, first for KDE4, then for Gnome
     # the signature is not correct, so rely on pynotify only at the moment
     #try:
@@ -529,6 +533,28 @@ if __name__ == '__main__':
     readfrequency = int(config_get('autosync', 'readfrequency'))
     coalesce_seconds = 2
     syncmethod = config_get('autosync', 'syncmethod')
+    
+    # in the upper pynotify try, the desktopnotify options are set, but can override here
+    notifymethod = config_get('autosync', 'notifymethod', optional=True)
+    if not notifymethod or notifymethod == 'desktop':
+	xmppnotify = False
+	logging.info('Using only desktop notification')
+    elif notifymethod == 'xmpp':
+	xmppnotify = True
+	desktopnotifygnome = False
+	desktopnotifykde = False
+	logging.info('Using only XMPP notification')
+    elif notifymethod == 'all':
+	xmppnotify = True
+	logging.info('Using all notification methods')
+    elif notifymethod == 'none':
+	xmppnotify = False
+	desktopnotifygnome = False
+	desktopnotifykde = False
+	logging.info('Disabling all notification methods, will only log to console')
+    else:
+	logging.warning('Unknown notifymethod "%s" configured, will keep default (desktop)', notifymethod)
+    
     pulllock = config_get('autosync', 'pulllock')
     if pulllock == 'conservative':
         conservative_pull_lock = True
@@ -538,7 +564,7 @@ if __name__ == '__main__':
         sys.exit(101)
     else:
         logging.error('Unknown pull lock strategy %s, please use either conservative or optimized', pulllock)
-        sys.exit(100)
+        sys.exit(100)    
     
     # Read required DVCS commands
     cmd_status = config_get('dvcs', 'statuscmd')
@@ -576,7 +602,10 @@ if __name__ == '__main__':
     if syncmethod == 'xmpp':
 	username = config_get('xmpp', 'username')
 	password = config_get('xmpp', 'password')
-	alsonotify = config_get('xmpp', 'alsonotify', True)
+	alsonotify = config_get('xmpp', 'alsonotify', optional=True)
+	if xmppnotify and not alsonotify:
+	    logger.warning('XMPP notification requested, but alsonotify option not configured, will not send XMPP notifications')
+
 	hostname = os.uname()[1]
 	res = 'AutosyncJabberBot on %s' % hostname
 	try:
@@ -585,8 +614,6 @@ if __name__ == '__main__':
 		bot = AutosyncJabberBot(username, password, res=res, debug=False, ignoreownmsg=False)
 		bot.start_serving()
 	    bot.send(username, 'login %s' % res)
-	    if alsonotify:
-		bot.send(alsonotify, 'Autosync logged in with XMPP id %s' % username)
 	    printmsg('Autosync Jabber login successful', 'Successfully logged into account %s' % username)
 	except Exception as e:
 	    logging.error("Exception %s: %s", type(e), e)
@@ -627,7 +654,7 @@ if __name__ == '__main__':
     # TODO: daemonize
     # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
     notifier.start()
-    logging.info('Executing startup synchronizaion')
+    logging.info('Executing startup synchronization')
     handler.protected_pull()
     if not conservative_pull_lock:
         # only need to run the startup command here when not using conservative pull locking - otherwise the protected_pull will already do it
