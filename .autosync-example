@@ -1,6 +1,7 @@
 [autosync]
 path = ~/amw
 pidfile = ~/.autosync.pid
+
 # Available synchronization methods: "xmpp" and "none", "autosync-server"
 # may be implemented later (to potentially be interoperable with SparkleShare).
 # If xmpp is set as synchronization method, a config section [xmpp] with at 
@@ -9,6 +10,15 @@ pidfile = ~/.autosync.pid
 #syncmethod = none
 #syncmethod = autosync-server
 syncmethod = xmpp
+
+# Available notification methods: "desktop", "xmpp", "all", and "none".
+# Default if not specified is "desktop" and indicates that KDE/Gnome/notify 
+# notifications (typically in the tray area) should be used to inform the user
+# when anything noticable happens. "none" disables notifications altogether
+# and "xmpp" causes notifications to be sent via XMPP to the account specified
+# in the "alsonotify" option in section [xmpp]. "all" will send notifications
+# to both desktop and xmpp.
+notifymethod = all
 
 # There are currently two options for handling file notifications, as neither 
 # one is perfect. You can choose between the 'conservative' option, which is
