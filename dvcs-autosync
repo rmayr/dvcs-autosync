@@ -41,6 +41,7 @@ knotify = None
 notifier = None
 bot = None
 hostname = None
+pidfile = None
 
 def printmsg(title, msg, level=logging.INFO):
     urgencies = {logging.DEBUG: pynotify.URGENCY_LOW,
@@ -485,6 +486,11 @@ def signal_handler(signal, frame):
         notifier.stop()
     if bot:
         bot.stop_serving()
+
+    # also remove the pidfile after a clean shutdown
+    if pidfile and os.path.exists(pidfile):
+	os.remove(pidfile)
+        
     sys.exit(0)
 
 
@@ -518,7 +524,10 @@ if __name__ == '__main__':
         config_locations = [sys.argv[1], defaultcfgpath]
     else:
         config_locations = [defaultcfgpath]
-    config.read(config_locations)
+    read_configfiles = config.read(config_locations)
+    if not read_configfiles[0]:
+	logging.error('No config file specified or config file(s) ' + config_locations + ' could not be opened')
+	sys.exit(10)
 
     pathstr = config_get('autosync', 'path')
     path = os.path.normpath(os.path.expanduser(pathstr))
@@ -528,7 +537,33 @@ if __name__ == '__main__':
         logging.error('path %s (expanded from %s) does not exist', path, pathstr)
         sys.exit(100)
     
-    pidfile = config_get('autosync', 'pidfile')
+    # ensure that the script is not running twice with the same config file
+    pidfile = config_get('autosync', 'pidfile', optional=True)
+    if not pidfile:
+	# default pidfile name if not specified in config
+	pidfile = read_configfiles[0] + '.pid'
+    pidfile = os.path.normpath(os.path.expanduser(pidfile))
+    logging.debug('Checking/writing pidfile %s' % pidfile)
+    # does the file already exist?
+    if os.access(pidfile, os.F_OK):
+	# check if a process with that PID is still running
+	pidfd = open(pidfile)
+	pidfd.seek(0)
+        old_pid = pidfd.readline()
+        # Now we check the PID from lock file matches to the current
+        # process PID
+        if os.path.exists("/proc/%s" % old_pid):
+	    logging.error('DVCS-autosync already running with config file %s under PID %s, exiting now' % (read_configfiles[0], old_pid))
+            sys.exit(9)
+        else:
+	    logging.warning('PID file %s already exists, but no process seems to be running, removing file now' % pidfile)
+	    os.remove(pidfile)
+    # if we get to here, process is not running and pidfile doesn't exist (anymore)
+    cur_pid = str(os.getpid())
+    pidfd = open(pidfile, 'w')
+    pidfd.write(cur_pid)
+    pidfd.close()
+    
     ignorepaths = config_get('autosync', 'ignorepath')
     readfrequency = int(config_get('autosync', 'readfrequency'))
     coalesce_seconds = 2
