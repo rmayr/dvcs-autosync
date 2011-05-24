@@ -58,6 +58,7 @@ knotify = None
 notifier = None
 bot = None
 hostname = None
+username = None
 pidfile = None
 
 def printmsg(title, msg, level=logging.INFO):
@@ -455,7 +456,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
     def _real_push(self, arg):
         proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
         (remoteurl, errors) = proc.communicate()
-        printmsg('Pushing changes', 'Pushing last local changes to remote repository %s', remoteurl)
+        printmsg('Pushing changes', 'Pushing last local changes to remote repository %s' % remoteurl)
         
         with lock:
             # TODO: check if we actually need a pull or a check-for-pull here 
@@ -467,8 +468,8 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             self._exec_cmd(cmd_push)
 	
         # and try to notify other instances
-        if bot and sendto:
-            bot.send(sendto, 'pushed %s' % remoteurl)
+        if bot:
+            bot.send(username, 'pushed %s' % remoteurl)
 
     def protected_pull(self):
         printmsg('Pulling changes', 'Pulling changes from remote repository')
