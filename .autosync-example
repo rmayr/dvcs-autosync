@@ -90,7 +90,8 @@ pullcmd = git pull
 remoteurlcmd = git config --get remote.origin.url
 
 # for mercurial
-#statuscmd = hg status
+# next line works with bash as shell, returning 0 if nothing has changed
+#statuscmd = test "`hg status`" = ""
 #addcmd = hg add
 #rmcmd = hg remove
 #modifycmd = 
