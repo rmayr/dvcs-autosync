@@ -205,7 +205,8 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
     def stop_serving(self):
         self._running = False
-        self._thread.join()
+        if self._thread:
+	    self._thread.join()
 
     def on_ping_timeout(self):
         raise IOError, "Ping timeout"
@@ -525,8 +526,8 @@ if __name__ == '__main__':
     else:
         config_locations = [defaultcfgpath]
     read_configfiles = config.read(config_locations)
-    if not read_configfiles[0]:
-	logging.error('No config file specified or config file(s) ' + config_locations + ' could not be opened')
+    if len(read_configfiles) == 0:
+	logging.error('No config file specified or config file(s) %s could not be opened' % config_locations)
 	sys.exit(10)
 
     pathstr = config_get('autosync', 'path')
