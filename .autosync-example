@@ -99,6 +99,7 @@ remoteurlcmd = git config --get remote.origin.url
 #commitcmd = hg commit -m %s
 #pushcmd = hg push
 #pullcmd = hg pull -u
+#remoteurlcmd = hg showconfig paths.default
 
 [xmpp]
 username = your XMPP id here
