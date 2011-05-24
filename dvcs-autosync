@@ -327,7 +327,7 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                 self._push_timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
                 self._push_timer.start()
         else:
-            logging.debug('Git reported that there is nothing to commit, not touching commit timer')
+            logging.debug('%s reported that there is nothing to commit, not touching commit timer' % cmd_commit.split(' ')[0])
 
     def _queue_action(self, event, action, parms, act_on_dirs=False):
         curpath = event.pathname
