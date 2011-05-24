@@ -253,11 +253,11 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         self._file_events = dict()
         
     def _exec_cmd(self, commands, parms = None):
+        j = 0
         for command in commands.split('\n'):
             cmdarray = command.split(' ')
             if parms:
                 i = 0
-                j = 0
                 while i < len(cmdarray):
                     if cmdarray[i] == '%s':
                         logging.debug('Substituting cmd part %s with %s', cmdarray[i], parms[j])
