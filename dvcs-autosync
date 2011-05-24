@@ -258,6 +258,17 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             with lock:
                 handler.protected_pull()
 
+    @botcmd
+    def login(self, mess, args):
+        """The bot sends a "login" message first. ignore it"""
+        return
+
+    @botcmd
+    def unknown(self, mess, args):
+        """Should somebody say something that is not a command, all bots will
+        reply with "Unknown command...." to which all bots will reply that thay
+        do not know the command "Unknown"..."""
+        return
 
 class FileChangeHandler(pyinotify.ProcessEvent):
     def my_init(self, cwd, ignored):
@@ -276,11 +287,11 @@ class FileChangeHandler(pyinotify.ProcessEvent):
         self._file_events = dict()
         
     def _exec_cmd(self, commands, parms = None):
+        j = 0
         for command in commands.split('\n'):
             cmdarray = command.split(' ')
             if parms:
                 i = 0
-                j = 0
                 while i < len(cmdarray):
                     if cmdarray[i] == '%s':
                         logging.debug('Substituting cmd part %s with %s', cmdarray[i], parms[j])
