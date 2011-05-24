@@ -23,7 +23,7 @@ __website__ = 'http://www.mayrhofer.eu.org/dvcs-autosync'
 __license__ = 'GPL v2 or v3'
 
 # Imports for various platforms and error handling concerning optional Python modules
-import warnings, sys, signal, os, time, subprocess, threading, fnmatch, ConfigParser, logging, threading
+import warnings, sys, signal, os, time, subprocess, threading, fnmatch, ConfigParser, logging
 
 try:
     import pyinotify
