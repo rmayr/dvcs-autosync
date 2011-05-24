@@ -58,6 +58,7 @@ knotify = None
 notifier = None
 bot = None
 hostname = None
+username = None
 pidfile = None
 
 def printmsg(title, msg, level=logging.INFO):
@@ -467,8 +468,8 @@ class FileChangeHandler(pyinotify.ProcessEvent):
             self._exec_cmd(cmd_push)
 	
         # and try to notify other instances
-        if bot and sendto:
-            bot.send(sendto, 'pushed %s' % remoteurl)
+        if bot:
+            bot.send(username, 'pushed %s' % remoteurl)
 
     def protected_pull(self):
         printmsg('Pulling changes', 'Pulling changes from remote repository')
