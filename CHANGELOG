@@ -1,13 +1,12 @@
 Version 0.4
- * Significantly improved event coalescing to distinguish between events on 
-   a single file (being updated repeatedly e.g. by an editor) and events on
-   multiple files (such as moving directories or unpacking archives).
  * Debian packaging.
  * Improved logging and notifications contributed by Dieter Plaetinck.
  * Added improvements by René 'Necoro' Neumann to make the embedded Jabberbot
    more stable with regards to reconnections. Instead of running a tight loop
    while trying to reconnect, ping the server regularly and queue the messages
    until the connection can be re-established.
+ * Support configurable notifications (desktop notifications, XMPP, all, or 
+   none).
 
 Version 0.3
  * First public release, announced on vcs-home@lists.madduck.net.
