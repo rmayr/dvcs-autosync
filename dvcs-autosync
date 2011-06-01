@@ -464,10 +464,10 @@ def config_get (section, option, optional=False):
             sys.exit(2)
     except ConfigParser.NoOptionError:
         if not optional:
-            printmsg ("Configuration error", "Could not load option %s from section %s from configuration at %s" % (option, section, config_lotations), level=logging.ERROR)
+            printmsg ("Configuration error", "Could not load option %s from section %s from configuration at %s" % (option, section, config_locations), level=logging.ERROR)
             sys.exit(2)
     except ConfigParser.ParsingError:
-        printmsg ("Configuration error", "Could not parse configuration at %s" % config_lotations, level=logging.ERROR)
+        printmsg ("Configuration error", "Could not parse configuration at %s" % config_locations, level=logging.ERROR)
         sys.exit(2)
     return ret
 
