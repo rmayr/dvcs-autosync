@@ -3,7 +3,7 @@ Section: utils
 Priority: optional
 Maintainer: Rene Mayrhofer <rmayr@debian.org>
 Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7.0.50~), python-support, git
-Standards-Version: 3.8.4
+Standards-Version: 3.9.2
 Homepage: http://www.mayrhofer.eu.org/dvcs-autosync
 Vcs-Git: git://gitorious.org/dvcs-autosync/dvcs-autosync.git
 Vcs-Browser: http://gitorious.org/dvcs-autosync
