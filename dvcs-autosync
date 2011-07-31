@@ -109,7 +109,7 @@ def printmsg(title, msg, level=logging.INFO):
             knotify.event(kdelevels[level], 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
         elif desktopnotifygrowl:
             gnotify.notify("Every notifications", title, msg, gnotifyIcon)
-            time.sleep(0.01)
+            time.sleep(0.1) # When sending multiple notifications at the same time, Growl seems to only consider the latest. This little delay prevent that.
     except:
         pass
 
@@ -750,11 +750,11 @@ if __name__ == '__main__':
 
     try:
         import Growl
-        gnotify = Growl.GrowlNotifier( "AutoSync", ["Every notifications"])
-        gnotify.register()
-        logging.info('Growl initialized successfully, will use desktop notifications')
         gnotifyImagePath = os.path.abspath('./icons/48x48/dvcs-autosync.png')
         gnotifyIcon = Growl.Image.imageFromPath(gnotifyImagePath)
+        gnotify = Growl.GrowlNotifier( "AutoSync", ["Every notifications"], applicationIcon=gnotifyIcon)
+        gnotify.register()
+        logging.info('Growl initialized successfully, will use desktop notifications')
         desktopnotifygrowl = True
     except:
         logging.info('Growl does not seem to be installed')
