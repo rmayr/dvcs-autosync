@@ -1,28 +1,8 @@
 [autosync]
-path = ~/amw
-# If pidfile is not explicitly specified, the name of the used config file
-# will be appended with '.pid', e.g. for a config file ~/.autosync, the PID
-# will be written to ~/.autosync.pid. This option allows to override the
-# default.
-#pidfile = ~/.autosync.pid
-
-# Available synchronization methods: "xmpp" and "none", "autosync-server"
-# may be implemented later (to potentially be interoperable with SparkleShare).
-# If xmpp is set as synchronization method, a config section [xmpp] with at 
-# least two config variables username and password must exist, otherwise 
-# dvcs-autosync will fail to start.
-#syncmethod = none
-#syncmethod = autosync-server
+path = ~/Desktop/splashbin
+pidfile = ~/.autosync.pid
 syncmethod = xmpp
-
-# Available notification methods: "desktop", "xmpp", "all", and "none".
-# Default if not specified is "desktop" and indicates that KDE/Gnome/notify 
-# notifications (typically in the tray area) should be used to inform the user
-# when anything noticable happens. "none" disables notifications altogether
-# and "xmpp" causes notifications to be sent via XMPP to the account specified
-# in the "alsonotify" option in section [xmpp]. "all" will send notifications
-# to both desktop and xmpp.
-notifymethod = all
+#syncmethod = autosync-server
 
 # There are currently two options for handling file notifications, as neither 
 # one is perfect. You can choose between the 'conservative' option, which is
@@ -64,8 +44,7 @@ pulllock = conservative
 # this lower will increase the synchronization speed at the cost of CPU and
 # transfer resources.
 readfrequency = 5
-ignorepath = .git .svn .hg src/packages src/java/openuat 
-    src/csharp/sparkleshare src/cpp/cross/keepassx src/android/ipv6config 
+ignorepath = .git
 
 # Note: addcmd, rmcmd, and modifycmd take one argument, movecmd takes two (first the source, then the destination).
 # Note: statuscmd should return with code 0 when nothing has changed in the 
@@ -74,24 +53,23 @@ ignorepath = .git .svn .hg src/packages src/java/openuat
 # Note: commitcmd also takes one argument, which will be substituted by a generated commit message.
 [dvcs]
 # for git
-statuscmd = git status | grep -iq "nothing to commit"
-addcmd = git add %s
-rmcmd = git rm -r %s
-modifycmd = git add %s
+statuscmd = git.cmd status | find /I "nothing to commit"
+addcmd = git.cmd add %s
+rmcmd = git.cmd rm %s
+modifycmd = git.cmd add %s
 # doesn't work when the source file no longer exists, git expects to move it itself
 #movecmd = git mv %s %s
 # use this instead, git will figure out that it was a move because the file is similar
-movecmd = git rm %s 
-    git add %s
-startupcmd = git add -A
-commitcmd = git commit -m %s
-pushcmd = git push
-pullcmd = git pull
-remoteurlcmd = git config --get remote.origin.url
+movecmd = git.cmd rm %s 
+    git.cmd add %s
+startupcmd = git.cmd add -A
+commitcmd = git.cmd commit -m %s
+pushcmd = git.cmd push
+pullcmd = git.cmd pull
+remoteurlcmd = git.cmd config --get remote.origin.url
 
 # for mercurial
-# next line works with bash as shell, returning 0 if nothing has changed
-#statuscmd = test "`hg status`" = ""
+#statuscmd = hg status
 #addcmd = hg add
 #rmcmd = hg remove
 #modifycmd = 
@@ -100,12 +78,11 @@ remoteurlcmd = git config --get remote.origin.url
 #commitcmd = hg commit -m %s
 #pushcmd = hg push
 #pullcmd = hg pull -u
-#remoteurlcmd = hg showconfig paths.default
 
 [xmpp]
-username = your XMPP id here
-password = your XMPP password here
-alsonotify = if set, another XMPP id that will get notified when something happens
+username = ascii158-autosync@jabber.org
+password = computer
+alsonotify =
 
 [autosync-server]
 server = http://whatever.sync.server

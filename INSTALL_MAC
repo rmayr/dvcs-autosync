@@ -1,0 +1,39 @@
+
+Install dvcs-autosync
+------------------------
+
+ * `git://gitorious.org/~olivierg/dvcs-autosync/olivierg-dvcs-autosync.git`
+ * `cd olivierg-dvcs-autosync`
+ * `python setup.py build`
+ * `sudo python setup.py install`
+ * `cp .autosync-example ~/.autosync`
+ * `open ~/.autosync`
+ * the config file will open in your default text editor, fill and save it 
+
+Install xmpppy
+------------------------
+
+ * Download the latest version here : http://xmpppy.sourceforge.net/
+ * Untar & `cd` to its folder
+ * `sudo python setup.py install`
+
+Install MacFSEvents
+------------------------
+
+ * `git clone https://github.com/malthe/macfsevents.git`
+ * `cd macfsevents`
+ * `sudo python setup.py install`
+ 
+Install Growl python binding
+------------------------
+
+ * Make sure you have Growl installed (or install it from growl.info)
+ * `cd` to `growl-python` folder of this repository (or download the Growl SDK on growl.info)
+ * `sudo python setup.py install`
+ * After the first launch, you will be able to configure (or disable) notifications in the Growl preferences pane.
+
+Run dvcs-autosync
+------------------------
+
+ * foreground : `dvcs-autosync`
+ * background : `screen -dmS autosync dvcs-autosync`

@@ -7,6 +7,7 @@ TODO - currently known bugs:
 * Moving directories is not tracked properly with the current event coalescing. Find out how to do a directory move in a better way or simply pass the "-r" option to git when working on directories.
 * definitely coalesce multiple file events within a time window instead of creating one commit for each file, e.g. when moving whole directory hierarchies (don't clutter the commit history with each file commit separately)
 * find out why the Jabber msg-to-self doesn't work in some cases
+* Mac OS X : git pull file manipulation are tracked and cause false "local change" alerts (stopped by git which says "no modification")
 
 TODO - short term:
 ------------------
