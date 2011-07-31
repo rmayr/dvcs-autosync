@@ -56,7 +56,7 @@ ignorepath = .git .svn .hg src/packages src/java/openuat
 # for git
 statuscmd = git status | grep -iq "nothing to commit"
 addcmd = git add %s
-rmcmd = git rm %s
+rmcmd = git rm -r %s
 modifycmd = git add %s
 # doesn't work when the source file no longer exists, git expects to move it itself
 #movecmd = git mv %s %s
