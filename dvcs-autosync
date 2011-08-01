@@ -750,8 +750,11 @@ if __name__ == '__main__':
 
     try:
         import Growl
-        gnotifyImagePath = os.path.abspath('./icons/48x48/dvcs-autosync.png')
-        gnotifyIcon = Growl.Image.imageFromPath(gnotifyImagePath)
+        gnotifyImagePath = os.path.abspath('/usr/share/icons/hicolor/48x48/apps/dvcs-autosync.png')
+        if os.path.exists(gnotifyImagePath):
+            gnotifyIcon = Growl.Image.imageFromPath(gnotifyImagePath)
+        else:
+            gnotifyIcon = None
         gnotify = Growl.GrowlNotifier( "AutoSync", ["Every notifications"], applicationIcon=gnotifyIcon)
         gnotify.register()
         logging.info('Growl initialized successfully, will use desktop notifications')
