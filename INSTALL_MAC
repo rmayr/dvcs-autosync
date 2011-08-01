@@ -6,9 +6,12 @@ Install dvcs-autosync
  * `cd olivierg-dvcs-autosync`
  * `python setup.py build`
  * `sudo python setup.py install`
+<<<<<<< HEAD
  * `cp .autosync-example ~/.autosync`
  * `open ~/.autosync`
  * the config file will open in your default text editor, fill and save it 
+=======
+>>>>>>> e39e184bc8a3cd0754c239e4340679936dad808e
 
 Install xmpppy
 ------------------------

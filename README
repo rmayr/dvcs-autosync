@@ -40,7 +40,10 @@ Linux:
 Mac OS X:
 
  * MacFSEvents (https://github.com/malthe/macfsevents/)
+<<<<<<< HEAD
  * Python 2.7 (included in Lion)
+=======
+>>>>>>> e39e184bc8a3cd0754c239e4340679936dad808e
 
 Recommended:
 
