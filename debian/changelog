@@ -1,6 +1,8 @@
 dvcs-autosync (0.5) ubuntu; urgency=low
 
   * Added icon for dvcs-autosync for pynotify (notification 'bubbles')
+  * Bump standards version and fix Git repo URL to the anonymous version.
+    Closes: #637387: dvcs-autosync: specified Vcs-git is not public accessible
 
  -- René Mayrhofer <rmayr@debian.org>  Wed, 24 Aug 2011 22:15:33 +0200
 
