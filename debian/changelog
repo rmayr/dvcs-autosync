@@ -1,3 +1,9 @@
+dvcs-autosync (0.5) ubuntu; urgency=low
+
+  * Added icon for dvcs-autosync for pynotify (notification 'bubbles')
+
+ -- René Mayrhofer <rmayr@debian.org>  Wed, 24 Aug 2011 22:15:33 +0200
+
 dvcs-autosync (0.4) unstable; urgency=low
 
   * Initial release (Closes: #620962: ITP: dvcs-autosync)
