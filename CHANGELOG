@@ -1,4 +1,6 @@
 Version 0.5
+ * Added Windows and Mac OS/X ports (thanks to Philipp Tölke and Olivier 
+   Guerriat, respectively, for the ports!).
  * Added icon for notification popups (patch by evgeni@golov.de via Gitorious, 
    thanks!).
 
