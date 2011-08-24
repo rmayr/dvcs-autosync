@@ -117,14 +117,11 @@ def printmsg(title, msg, level=logging.INFO):
         elif desktopnotifygrowl:
             gnotify.notify("Every notifications", title, msg, gnotifyIcon)
             time.sleep(0.1) # When sending multiple notifications at the same time, Growl seems to only consider the latest. This little delay prevent that.
-            
+
         if xmppnotify and bot and alsonotify:
-	    bot.send(alsonotify, '[%s]: %s' % (title, msg))
+            bot.send(alsonotify, '[%s]: %s' % (title, msg))
     except:
         pass
-
-    if xmppnotify and bot and alsonotify:
-	bot.send(alsonotify, '[%s]: %s' % (title, msg))
 
     logging.log(level, "NOTIFICATION: %s: %s" % (title, msg))
 
