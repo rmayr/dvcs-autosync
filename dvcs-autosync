@@ -362,7 +362,7 @@ class FileChangeHandler():
                     commitmsg = 'Autocommit of all changes since last autosync startup on host %s' % hostname
                 self._exec_cmd(cmd_commit, [commitmsg])
 
-        if retcode != 0:
+        if retcode != 0 and syncmethod != 'none':
             # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
             # this has the effect that, when another change is committed within the timer period (readfrequency seconds),
             # then these changes will be pushed in one go
@@ -947,8 +947,10 @@ if __name__ == '__main__':
         pass #TODO
 
     logging.info('Executing startup synchronizaion')
-    handler.protected_pull()
-    if not conservative_pull_lock:
+    if syncmethod != 'none':
+	handler.protected_pull()
+	
+    if not conservative_pull_lock or syncmethod == 'none':
         # only need to run the startup command here when not using conservative pull locking - otherwise the protected_pull will already do it
         handler.startup()
     
