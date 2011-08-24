@@ -11,6 +11,7 @@
 #   disconnects, bug fixes
 # * Philipp Tölke: Windows port
 # * Olivier Guerriat : Mac OS port, Growl support
+# * evgeni@golov.de: Various bugfixes
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -48,6 +49,7 @@ except:
 if not detected_os:
     logging.error('Unsupported OS, sorry.')
     sys.exit(2)
+
 
 if not hasattr(subprocess, 'check_output'):
     # see https://gist.github.com/839684
@@ -115,11 +117,11 @@ def printmsg(title, msg, level=logging.INFO):
         elif desktopnotifygrowl:
             gnotify.notify("Every notifications", title, msg, gnotifyIcon)
             time.sleep(0.1) # When sending multiple notifications at the same time, Growl seems to only consider the latest. This little delay prevent that.
-    except:
-        pass
 
-    if xmppnotify and bot and alsonotify:
-	bot.send(alsonotify, '[%s]: %s' % (title, msg))
+        if xmppnotify and bot and alsonotify:
+            bot.send(alsonotify, '[%s]: %s' % (title, msg))
+     except:
+        pass
 
     logging.log(level, "NOTIFICATION: %s: %s" % (title, msg))
 
@@ -307,6 +309,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
         reply with "Unknown command...." to which all bots will reply that thay
         do not know the command "Unknown"..."""
         return
+
 
 class FileChangeHandler():
     def __init__(self, cwd, ignored):
@@ -540,6 +543,7 @@ if detected_os == "LINUX":
                 logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
                 self.handler._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
 
+
 if detected_os == "WINDOWS":
     class WindowsFileChangeHandlerAdapter(threading.Thread):
 	def __init__(self, path, ignoreabsolutepaths, handler):
@@ -604,7 +608,6 @@ if detected_os == "WINDOWS":
 			self.handler._queue_action(event, cmd_modify, [event.pathname])
 
 
-
 if detected_os == "MAC_OS":
     class MacOSFileChangeHandlerAdapter(threading.Thread):
     	def __init__(self, path, ignoreabsolutepaths, handler):
@@ -663,7 +666,7 @@ if detected_os == "MAC_OS":
             stream = Stream(self, self.path, file_events=True)
             observer.schedule(stream)
 
-def initialize_win32notify(path, ignoreabsolutepaths, handler):
+def initialize_win32notify(path, ignoreabsolutepaths, handler): # Windows
     adapter = WindowsFileChangeHandlerAdapter(path, ignoreabsolutepaths, handler)
     adapter.daemon = True
     adapter.start()
@@ -673,7 +676,7 @@ def initialize_fsevents(path, ignoreabsolutepaths, handler): # Mac OS
     adapter.daemon = True
     adapter.start()
 
-def initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfrequency, handler):
+def initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfrequency, handler): # Linux
     excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
     wm = pyinotify.WatchManager()
     # TODO: frequency doesn't work....
@@ -694,8 +697,6 @@ def initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfreque
         logging.warning("pyinotify.WatchManagerError: %s, %s", e, e.wmd)
 
     logging.info('Start monitoring %s (type c^c to exit)', path)
-    # TODO: daemonize
-    # notifier.loop(daemonize=True, pid_file=pidfile, force_kill=True)
     notifier.start()
 
 
