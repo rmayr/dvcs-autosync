@@ -1,3 +1,7 @@
+Version 0.5
+ * Added icon for notification popups (patch by evgeni@golov.de via Gitorious, 
+   thanks!).
+
 Version 0.4
  * Debian packaging.
  * Improved logging and notifications contributed by Dieter Plaetinck.

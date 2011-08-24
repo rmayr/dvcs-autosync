@@ -18,7 +18,7 @@
 from __future__ import with_statement
 
 __author__ = 'René Mayrhofer <rene@mayrhofer.eu.org>'
-__version__ = '0.4'
+__version__ = '0.5'
 __website__ = 'http://www.mayrhofer.eu.org/dvcs-autosync'
 __license__ = 'GPL v2 or v3'
 
@@ -36,7 +36,7 @@ if not hasattr(subprocess, 'check_output'):
             cmd = kwargs.get("args")
             if cmd is None:
                 cmd = popenargs[0]
-            raise CalledProcessError(retcode, cmd)
+            raise subprocess.CalledProcessError(retcode, cmd)
         return output
     subprocess.check_output = check_output
 
@@ -60,6 +60,7 @@ bot = None
 hostname = None
 username = None
 pidfile = None
+icon = None
 
 def printmsg(title, msg, level=logging.INFO):
     urgencies = {logging.DEBUG: pynotify.URGENCY_LOW,
@@ -76,6 +77,8 @@ def printmsg(title, msg, level=logging.INFO):
     try:
         if desktopnotifygnome:
             n = pynotify.Notification(title, msg)
+            if icon:
+		n.set_icon_from_pixbuf(icon)
             n.set_urgency(urgencies[level])
             n.show()
         elif desktopnotifykde:
@@ -303,7 +306,10 @@ class FileChangeHandler(pyinotify.ProcessEvent):
                 out = subprocess.check_output(cmdarray, cwd=self.cwd, stderr=subprocess.STDOUT)
                 logging.debug("Command '%s' in '%s'. Output:\n%s" % (" ".join (cmdarray), self.cwd, out))
             except subprocess.CalledProcessError, e:
-                printmsg('Command failed', "Command '%s' in '%s' failed.  Output:\n%s" % (" ".join (cmdarray), self.cwd, e.output), level=logging.WARNING)
+	        if hasattr(e, 'output'):
+		    printmsg('Command failed', "Command '%s' in '%s' failed.  Output:\n%s" % (" ".join (cmdarray), self.cwd, e.output), level=logging.WARNING)
+		else:
+		    printmsg('Command failed', "Command '%s' in '%s' failed." % (" ".join (cmdarray), self.cwd), level=logging.WARNING)
 
     def _post_action_steps(self, curpath = None):
         with lock:
@@ -539,7 +545,11 @@ if __name__ == '__main__':
     #except:
 	#print 'KDE4 KNotify does not seem to run or dbus is not installed'
     try:
-        import pynotify
+        import pynotify, gtk
+        try:
+	    icon = gtk.IconTheme().load_icon('dvcs-autosync', 48, gtk.ICON_LOOKUP_GENERIC_FALLBACK)
+	except:
+	    icon = None
         if pynotify.init('autosync application'):
             logging.info('pynotify initialized successfully, will use desktop notifications')
             desktopnotifygnome = True
