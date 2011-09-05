@@ -666,6 +666,7 @@ if detected_os == "MAC_OS":
             stream = Stream(self, self.path, file_events=True)
             observer.schedule(stream)
 
+
 def initialize_win32notify(path, ignoreabsolutepaths, handler): # Windows
     adapter = WindowsFileChangeHandlerAdapter(path, ignoreabsolutepaths, handler)
     adapter.daemon = True
