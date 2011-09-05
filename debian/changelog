@@ -1,3 +1,10 @@
+dvcs-autosync (0.5.1) unstable; urgency=low
+
+  * Depend on python (>= 2.6), as dvcs-autosync will not work with Python 2.5.
+    Closes: #639650: [dvcs-autosync] depends on python >= 2.6
+
+ -- Rene Mayrhofer <rmayr@debian.org>  Mon, 05 Sep 2011 15:41:02 +0200
+
 dvcs-autosync (0.5) unstable; urgency=low
 
   * Added icon for dvcs-autosync for pynotify (notification 'bubbles')
