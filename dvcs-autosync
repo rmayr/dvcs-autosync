@@ -50,6 +50,7 @@ if not detected_os:
     logging.error('Unsupported OS, sorry.')
     sys.exit(2)
 
+from configuration import config
 
 if not hasattr(subprocess, 'check_output'):
     # see https://gist.github.com/839684
@@ -109,10 +110,10 @@ def printmsg(title, msg, level=logging.INFO):
                          logging.CRITICAL: pynotify.URGENCY_CRITICAL}
             n = pynotify.Notification(title, msg)
             if icon:
-		n.set_icon_from_pixbuf(icon)
+                n.set_icon_from_pixbuf(icon)
             n.set_urgency(urgencies[level])
             n.show()
-        elifd esktopnotifykde:
+        elif desktopnotifykde:
             knotify.event(kdelevels[level], 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
         elif desktopnotifygrowl:
             gnotify.notify("Every notifications", title, msg, gnotifyIcon)
@@ -263,7 +264,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
     def stop_serving(self):
         self._running = False
         if self._thread:
-	    self._thread.join()
+            self._thread.join()
 
     def on_ping_timeout(self):
         raise IOError, "Ping timeout"
@@ -343,10 +344,10 @@ class FileChangeHandler():
                 out = subprocess.check_output(cmdarray, cwd=self.cwd, stderr=subprocess.STDOUT)
                 logging.debug("Command '%s' in '%s'. Output:\n%s" % (" ".join (cmdarray), self.cwd, out))
             except subprocess.CalledProcessError, e:
-	        if hasattr(e, 'output'):
-		    printmsg('Command failed', "Command '%s' in '%s' failed.  Output:\n%s" % (" ".join (cmdarray), self.cwd, e.output), level=logging.WARNING)
-		else:
-		    printmsg('Command failed', "Command '%s' in '%s' failed." % (" ".join (cmdarray), self.cwd), level=logging.WARNING)
+                if hasattr(e, 'output'):
+                    printmsg('Command failed', "Command '%s' in '%s' failed.  Output:\n%s" % (" ".join (cmdarray), self.cwd, e.output), level=logging.WARNING)
+                else:
+                    printmsg('Command failed', "Command '%s' in '%s' failed." % (" ".join (cmdarray), self.cwd), level=logging.WARNING)
 
     def _post_action_steps(self, curpath = None):
         with lock:
@@ -514,12 +515,12 @@ if detected_os == "LINUX":
             self.handler._queue_action(event, cmd_rm, [event.pathname])
 
         def process_IN_CREATE(self, event):
-	    # sanity check - don't add file if it (no longer) exists in the file system!
-	    if not os.path.exists(event.pathname):
-		logging.debug('Ignoring file create event on %s, as it (no longer) exists - it was probably created as a temporary file and immediately removed by the application', event.pathname)
-		return
+            # sanity check - don't add file if it (no longer) exists in the file system!
+            if not os.path.exists(event.pathname):
+                logging.debug('Ignoring file create event on %s, as it (no longer) exists - it was probably created as a temporary file and immediately removed by the application', event.pathname)
+                return
 
-	    self.handler._queue_action(event, cmd_add, [event.pathname])
+            self.handler._queue_action(event, cmd_add, [event.pathname])
 
         def process_IN_MODIFY(self, event):
             self.handler._queue_action(event, cmd_modify, [event.pathname])
@@ -546,99 +547,99 @@ if detected_os == "LINUX":
 
 if detected_os == "WINDOWS":
     class WindowsFileChangeHandlerAdapter(threading.Thread):
-	def __init__(self, path, ignoreabsolutepaths, handler):
-	    threading.Thread.__init__(self)
-	    self.handler = handler
-	    self.ignoreabsolutepaths = ignoreabsolutepaths
-	    self.path = path
+        def __init__(self, path, ignoreabsolutepaths, handler):
+            threading.Thread.__init__(self)
+            self.handler = handler
+            self.ignoreabsolutepaths = ignoreabsolutepaths
+            self.path = path
 
-	# This is to mimic the event-type of inotify
-	class MyEvent():
-	    def __init__(self, dir, pathname, action):
-		self.dir = dir
-		self.pathname = pathname
-		self.maskname = [ "", "IN_CREATE", "IN_DELETE", "IN_MODIFY", "IN_DELETE", "IN_CREATE"][action]
+        # This is to mimic the event-type of inotify
+        class MyEvent():
+            def __init__(self, dir, pathname, action):
+                self.dir = dir
+                self.pathname = pathname
+                self.maskname = [ "", "IN_CREATE", "IN_DELETE", "IN_MODIFY", "IN_DELETE", "IN_CREATE"][action]
 
-	def run(self):
-	    import win32file, win32con
+        def run(self):
+            import win32file, win32con
 
-	    FILE_LIST_DIRECTORY = 0x0001
+            FILE_LIST_DIRECTORY = 0x0001
 
-	    path_to_watch = self.path
-	    hDir = win32file.CreateFile (
-	      path_to_watch,
-	      FILE_LIST_DIRECTORY,
-	      win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE,
-	      None,
-	      win32con.OPEN_EXISTING,
-	      win32con.FILE_FLAG_BACKUP_SEMANTICS,
-	      None
-	    )
+            path_to_watch = self.path
+            hDir = win32file.CreateFile (
+              path_to_watch,
+              FILE_LIST_DIRECTORY,
+              win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE,
+              None,
+              win32con.OPEN_EXISTING,
+              win32con.FILE_FLAG_BACKUP_SEMANTICS,
+              None
+            )
 
-	    while 1:
-		results = win32file.ReadDirectoryChangesW (
-			hDir,
-			1024,
-			True,
-			win32con.FILE_NOTIFY_CHANGE_FILE_NAME |
-			win32con.FILE_NOTIFY_CHANGE_DIR_NAME |
-			win32con.FILE_NOTIFY_CHANGE_ATTRIBUTES |
-			win32con.FILE_NOTIFY_CHANGE_SIZE |
-			win32con.FILE_NOTIFY_CHANGE_LAST_WRITE |
-			win32con.FILE_NOTIFY_CHANGE_SECURITY,
-			None,
-			None
-			)
-		for action, file in results:
-		    full_filename = os.path.join (path_to_watch, file)
+            while 1:
+                results = win32file.ReadDirectoryChangesW (
+                        hDir,
+                        1024,
+                        True,
+                        win32con.FILE_NOTIFY_CHANGE_FILE_NAME |
+                        win32con.FILE_NOTIFY_CHANGE_DIR_NAME |
+                        win32con.FILE_NOTIFY_CHANGE_ATTRIBUTES |
+                        win32con.FILE_NOTIFY_CHANGE_SIZE |
+                        win32con.FILE_NOTIFY_CHANGE_LAST_WRITE |
+                        win32con.FILE_NOTIFY_CHANGE_SECURITY,
+                        None,
+                        None
+                        )
+                for action, file in results:
+                    full_filename = os.path.join (path_to_watch, file)
 
-		    #check if this file is ignored:
-		    if True in [x in full_filename for x in self.ignoreabsolutepaths]:
-			continue
+                    #check if this file is ignored:
+                    if True in [x in full_filename for x in self.ignoreabsolutepaths]:
+                        continue
 
-		    event = self.MyEvent(os.path.isdir(file), file, action)
-		    if action == 1 or action == 5: #CREATE or MOVE_TO
-			self.handler._queue_action(event, cmd_add, [event.pathname])
-		    elif action == 2 or action == 4: #DELETE or MOVE_FROM
-			if os.path.exists(event.pathname):
-			    logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
-			    continue
-			self.handler._queue_action(event, cmd_rm, [event.pathname])
-		    elif action == 3: #MODIFY:
-			self.handler._queue_action(event, cmd_modify, [event.pathname])
+                    event = self.MyEvent(os.path.isdir(file), file, action)
+                    if action == 1 or action == 5: #CREATE or MOVE_TO
+                        self.handler._queue_action(event, cmd_add, [event.pathname])
+                    elif action == 2 or action == 4: #DELETE or MOVE_FROM
+                        if os.path.exists(event.pathname):
+                            logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
+                            continue
+                        self.handler._queue_action(event, cmd_rm, [event.pathname])
+                    elif action == 3: #MODIFY:
+                        self.handler._queue_action(event, cmd_modify, [event.pathname])
 
 
 if detected_os == "MAC_OS":
     class MacOSFileChangeHandlerAdapter(threading.Thread):
-    	def __init__(self, path, ignoreabsolutepaths, handler):
-    	    threading.Thread.__init__(self)
-    	    self.handler = handler
-    	    self.ignoreabsolutepaths = ignoreabsolutepaths
-    	    self.path = path
-    
-    	# This is to mimic the event-type of inotify
-    	class MyEvent():
-    	    def __init__(self, dir, pathname, action):
-    		self.dir = dir
-    		self.pathname = pathname
-    		masks = {   # from doc : http://developer.apple.com/library/mac/#documentation/Darwin/Reference/FSEvents_Ref/FSEvents_h/index.html#HeaderDoc_enums
-    		            256:"IN_CREATE", # created
-    		            512:"IN_DELETE", # removed
-    		            # in doc, but don't seem to be used, included to prevent potential bug
-    		            2048:"IN_MODIFY", # renamed
-    		            4096:"IN_MODIFY", # modified
-    		            0x00000400:'InodeMetaMod',
-    		            0x00002000:'FinderInfoMod',
-    		            0x00004000:'ChangeOwner',
-    		            0x00008000:'XattrMod',
-    		            # not in doc, but actually used
-    		            64:"IN_DELETE", # before rename
-    		            128:"IN_CREATE", # after rename
-    		            2:"IN_MODIFY",
-    		        }
-    		self.maskname = masks[action]
-    		print self.maskname
-        
+        def __init__(self, path, ignoreabsolutepaths, handler):
+                threading.Thread.__init__(self)
+                self.handler = handler
+                self.ignoreabsolutepaths = ignoreabsolutepaths
+                self.path = path
+
+        # This is to mimic the event-type of inotify
+        class MyEvent():
+            def __init__(self, dir, pathname, action):
+                self.dir = dir
+                self.pathname = pathname
+                masks = {   # from doc : http://developer.apple.com/library/mac/#documentation/Darwin/Reference/FSEvents_Ref/FSEvents_h/index.html#HeaderDoc_enums
+                                256:"IN_CREATE", # created
+                                512:"IN_DELETE", # removed
+                                # in doc, but don't seem to be used, included to prevent potential bug
+                                2048:"IN_MODIFY", # renamed
+                                4096:"IN_MODIFY", # modified
+                                0x00000400:'InodeMetaMod',
+                                0x00002000:'FinderInfoMod',
+                                0x00004000:'ChangeOwner',
+                                0x00008000:'XattrMod',
+                                # not in doc, but actually used
+                                64:"IN_DELETE", # before rename
+                                128:"IN_CREATE", # after rename
+                                2:"IN_MODIFY",
+                    }
+                self.maskname = masks[action]
+                print self.maskname
+
         def __call__(self, event):
             for ignoreabsolutepath in self.ignoreabsolutepaths:
                 if event.name.startswith(ignoreabsolutepath):
@@ -655,10 +656,8 @@ if detected_os == "MAC_OS":
                 self.handler._queue_action(event, cmd_rm, [event.pathname], act_on_dirs=True)
             elif event.maskname == "IN_MODIFY": #MODIFY:
                 self.handler._queue_action(event, cmd_modify, [event.pathname], act_on_dirs=True)
-        
-    	def run(self):
-    	    
-    	    observer = Observer()
+            def run(self):
+                observer = Observer()
             observer.start()
 
             #handler = self.process_event(self)
@@ -728,30 +727,33 @@ def signal_handler(signal, frame):
 
     # also remove the pidfile after a clean shutdown
     if pidfile and os.path.exists(pidfile):
-	os.remove(pidfile)
+        os.remove(pidfile)
         
     sys.exit(0)
 
-def main():
+#def main():
+
+
+if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     
     # try to set up desktop notification, first for KDE4, then for Gnome
     # the signature is not correct, so rely on pynotify only at the moment
     #try:
-	#import dbus
-	#knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
-	#knotify.event("warning", "autosync application", [],
-	    #'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS',
-	    #[], [], 0, dbus_interface='org.kde.KNotify')
-	#desktopnotifykde = True
+        #import dbus
+        #knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
+        #knotify.event("warning", "autosync application", [],
+            #'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS',
+            #[], [], 0, dbus_interface='org.kde.KNotify')
+        #desktopnotifykde = True
     #except:
-	#print 'KDE4 KNotify does not seem to run or dbus is not installed'
+        #print 'KDE4 KNotify does not seem to run or dbus is not installed'
     try:
         import pynotify, gtk
         try:
-	    icon = gtk.IconTheme().load_icon('dvcs-autosync', 48, gtk.ICON_LOOKUP_GENERIC_FALLBACK)
-	except:
-	    icon = None
+            icon = gtk.IconTheme().load_icon('dvcs-autosync', 48, gtk.ICON_LOOKUP_GENERIC_FALLBACK)
+        except:
+            icon = None
         if pynotify.init('autosync application'):
             logging.info('pynotify initialized successfully, will use desktop notifications')
             desktopnotifygnome = True
@@ -774,19 +776,20 @@ def main():
     except:
         logging.info('Growl does not seem to be installed')
 
-
-    config = ConfigParser.RawConfigParser()
+    
+    #config = ConfigParser.RawConfigParser()
     defaultcfgpath = os.path.expanduser('~/.autosync')
     if len(sys.argv) >= 2:
         config_locations = [sys.argv[1], defaultcfgpath]
     else:
         config_locations = [defaultcfgpath]
-    read_configfiles = config.read(config_locations)
-    if len(read_configfiles) == 0:
-	logging.error('No config file specified or config file(s) %s could not be opened' % config_locations)
-	sys.exit(10)
+    config.load(config_locations)
+    #read_configfiles = config.read(config_locations)
+    #if len(read_configfiles) == 0:
+        #logging.error('No config file specified or config file(s) %s could not be opened' % config_locations)
+        #sys.exit(10)
 
-    pathstr = config_get('autosync', 'path')
+    pathstr = config.get('autosync', 'path')
     path = os.path.normpath(os.path.expanduser(pathstr))
     if os.path.isdir(path):
         logging.info('Watching path %s', path)
@@ -795,61 +798,60 @@ def main():
         sys.exit(100)
     
     # ensure that the script is not running twice with the same config file
-    pidfile = config_get('autosync', 'pidfile', optional=True)
-    if not pidfile:
-	# default pidfile name if not specified in config
-	pidfile = read_configfiles[0] + '.pid'
+    pidfile = config.get('autosync', 'pidfile', "~/.autosync.pid")
+    #if not pidfile:
+        # default pidfile name if not specified in config
+        #pidfile = read_configfiles[0] + '.pid'
     pidfile = os.path.normpath(os.path.expanduser(pidfile))
     logging.debug('Checking/writing pidfile %s' % pidfile)
     # does the file already exist?
     if os.access(pidfile, os.F_OK):
-	# check if a process with that PID is still running
-	pidfd = open(pidfile)
-	pidfd.seek(0)
+    # check if a process with that PID is still running
+        pidfd = open(pidfile)
+        pidfd.seek(0)
         old_pid = pidfd.readline()
         # Now we check the PID from lock file matches to the current
         # process PID
         if os.path.exists("/proc/%s" % old_pid):
-	    logging.error('DVCS-autosync already running with config file %s under PID %s, exiting now' % (read_configfiles[0], old_pid))
+            logging.error('DVCS-autosync already running with config file %s under PID %s, exiting now' % (read_configfiles[0], old_pid))
             sys.exit(9)
         else:
-	    logging.warning('PID file %s already exists, but no process seems to be running, removing file now' % pidfile)
-	    os.remove(pidfile)
+            logging.warning('PID file %s already exists, but no process seems to be running, removing file now' % pidfile)
+            os.remove(pidfile)
     # if we get to here, process is not running and pidfile doesn't exist (anymore)
     cur_pid = str(os.getpid())
     pidfd = open(pidfile, 'w')
     pidfd.write(cur_pid)
     pidfd.close()
     
-    ignorepaths = config_get('autosync', 'ignorepath')
-    readfrequency = int(config_get('autosync', 'readfrequency'))
+    ignorepaths = config.get('autosync', 'ignorepath')
+    readfrequency = int(config.get('autosync', 'readfrequency'))
     coalesce_seconds = 2
-    syncmethod = config_get('autosync', 'syncmethod')
+    syncmethod = config.get('autosync', 'syncmethod')
     
     # in the upper pynotify try, the desktopnotify options are set, but can override here
-    notifymethod = config_get('autosync', 'notifymethod', optional=True)
+    notifymethod = config.get('autosync', 'notifymethod', "none")
     if not notifymethod or notifymethod == 'desktop':
-	xmppnotify = False
-	logging.info('Using only desktop notification')
+        xmppnotify = False
+        logging.info('Using only desktop notification')
     elif notifymethod == 'xmpp':
-	xmppnotify = True
-	desktopnotifygnome = False
-	desktopnotifykde = False
-	desktopnotifygrowl = False
-	logging.info('Using only XMPP notification')
+        xmppnotify = True
+        desktopnotifygnome = False
+        desktopnotifykde = False
+        desktopnotifygrowl = False
+        logging.info('Using only XMPP notification')
     elif notifymethod == 'all':
-	xmppnotify = True
-	logging.info('Using all notification methods')
+        xmppnotify = True
+        logging.info('Using all notification methods')
     elif notifymethod == 'none':
-	xmppnotify = False
-	desktopnotifygnome = False
-	desktopnotifykde = False
-	desktopnotifygrowl = False
-	logging.info('Disabling all notification methods, will only log to console')
+        xmppnotify = False
+        desktopnotifygnome = False
+        desktopnotifykde = False
+        desktopnotifygrowl = False
+        logging.info('Disabling all notification methods, will only log to console')
     else:
-	logging.warning('Unknown notifymethod "%s" configured, will keep default (desktop)', notifymethod)
-    
-    pulllock = config_get('autosync', 'pulllock')
+        logging.warning('Unknown notifymethod "%s" configured, will keep default (desktop)', notifymethod)
+    pulllock = config.get('autosync', 'pulllock')
     if pulllock == 'conservative':
         conservative_pull_lock = True
     elif pulllock == 'optimized':
@@ -861,16 +863,16 @@ def main():
         sys.exit(100)    
     
     # Read required DVCS commands
-    cmd_status = config_get('dvcs', 'statuscmd')
-    cmd_startup = config_get('dvcs', 'startupcmd')
-    cmd_commit = config_get('dvcs', 'commitcmd')
-    cmd_push = config_get('dvcs', 'pushcmd')
-    cmd_pull = config_get('dvcs', 'pullcmd')
-    cmd_add = config_get('dvcs', 'addcmd')
-    cmd_rm = config_get('dvcs', 'rmcmd')
-    cmd_modify = config_get('dvcs', 'modifycmd')
-    cmd_move = config_get('dvcs', 'movecmd')
-    cmd_remoteurl = config_get('dvcs', 'remoteurlcmd')
+    cmd_status = config.get('dvcs', 'statuscmd')
+    cmd_startup = config.get('dvcs', 'startupcmd')
+    cmd_commit = config.get('dvcs', 'commitcmd')
+    cmd_push = config.get('dvcs', 'pushcmd')
+    cmd_pull = config.get('dvcs', 'pullcmd')
+    cmd_add = config.get('dvcs', 'addcmd')
+    cmd_rm = config.get('dvcs', 'rmcmd')
+    cmd_modify = config.get('dvcs', 'modifycmd')
+    cmd_move = config.get('dvcs', 'movecmd')
+    cmd_remoteurl = config.get('dvcs', 'remoteurlcmd')
     
     # TODO: this is currently git-specific, should be configurable
     ignorefile = os.path.join(path, '.gitignore')
@@ -893,37 +895,37 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
 
     if syncmethod == 'xmpp':
-	username = config_get('xmpp', 'username')
-	password = config_get('xmpp', 'password')
-	alsonotify = config_get('xmpp', 'alsonotify', optional=True)
-	if xmppnotify and not alsonotify:
-	    logger.warning('XMPP notification requested, but alsonotify option not configured, will not send XMPP notifications')
+        username = config.get('xmpp', 'username')
+        password = config.get('xmpp', 'password')
+        alsonotify = config.get('xmpp', 'alsonotify', None)
+        if xmppnotify and alsonotify==None:
+            logger.warning('XMPP notification requested, but alsonotify option not configured, will not send XMPP notifications')
 
-	if (detected_os == "LINUX") or (detected_os == "MAC_OS"):
-	    hostname = os.uname()[1]
-	elif detected_os == "WINDOWS":
-	    hostname = win32api.GetComputerName()
-	else:
-	    hostname = "UNSUPPORTED_OS"
-	
-	res = 'AutosyncJabberBot on %s' % hostname
-	try:
-	    with warnings.catch_warnings():
-		warnings.filterwarnings("ignore",category=DeprecationWarning)
-		bot = AutosyncJabberBot(username, password, res=res, debug=False, ignoreownmsg=False)
-		bot.start_serving()
-	    bot.send(username, 'login %s' % res)
-	    printmsg('Autosync Jabber login successful', 'Successfully logged into account %s' % username)
-	except Exception as e:
-	    logging.error("Exception %s: %s", type(e), e)
-	    printmsg('Autosync Jabber login failed', 'Could not login to Jabber account %s. Will not announce pushes to other running autosync instances.' % username)
+        if (detected_os == "LINUX") or (detected_os == "MAC_OS"):
+            hostname = os.uname()[1]
+        elif detected_os == "WINDOWS":
+            hostname = win32api.GetComputerName()
+        else:
+            hostname = "UNSUPPORTED_OS"
+        
+        res = 'AutosyncJabberBot on %s' % hostname
+        try:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore",category=DeprecationWarning)
+                bot = AutosyncJabberBot(username, password, res=res, debug=False, ignoreownmsg=False)
+                bot.start_serving()
+            bot.send(username, 'login %s' % res)
+            printmsg('Autosync Jabber login successful', 'Successfully logged into account %s' % username)
+        except Exception as e:
+            logging.error("Exception %s: %s", type(e), e)
+            printmsg('Autosync Jabber login failed', 'Could not login to Jabber account %s. Will not announce pushes to other running autosync instances.' % username)
     elif syncmethod == 'autosync-server':
         logging.error('Alternative autosync-server sync method not fully implemented yet')
         sys.exit(101)
     elif syncmethod == 'none':
-	logging.info('Synchronization method none configured, will not attempt to synchronize with any repository')
+        logging.info('Synchronization method none configured, will not attempt to synchronize with any repository')
     else:
-	printmsg('No synchronization method configured', 'No or unknown syncmethod configured, will not attempt to synchronize with any repository', level=logging.WARNING)
+        printmsg('No synchronization method configured', 'No or unknown syncmethod configured, will not attempt to synchronize with any repository', level=logging.WARNING)
 
 
     printmsg('autosync starting', 'Initialization of local file notifications and Jabber login done, starting main loop')
@@ -944,8 +946,8 @@ def main():
 
     logging.info('Executing startup synchronizaion')
     if syncmethod != 'none':
-	handler.protected_pull()
-	
+        handler.protected_pull()
+        
     if not conservative_pull_lock or syncmethod == 'none':
         # only need to run the startup command here when not using conservative pull locking - otherwise the protected_pull will already do it
         handler.startup()
@@ -956,6 +958,3 @@ def main():
         time.sleep(10)
     
 
-
-if __name__ == '__main__':
-    main()
