@@ -112,7 +112,7 @@ def printmsg(title, msg, level=logging.INFO):
 		n.set_icon_from_pixbuf(icon)
             n.set_urgency(urgencies[level])
             n.show()
-        elif desktopnotifykde:
+        elifd esktopnotifykde:
             knotify.event(kdelevels[level], 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
         elif desktopnotifygrowl:
             gnotify.notify("Every notifications", title, msg, gnotifyIcon)
@@ -732,8 +732,7 @@ def signal_handler(signal, frame):
         
     sys.exit(0)
 
-
-if __name__ == '__main__':
+def main():
     logging.basicConfig(level=logging.DEBUG)
     
     # try to set up desktop notification, first for KDE4, then for Gnome
@@ -955,3 +954,8 @@ if __name__ == '__main__':
 
     while True:
         time.sleep(10)
+    
+
+
+if __name__ == '__main__':
+    main()
