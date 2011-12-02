@@ -723,7 +723,6 @@ def config_get (section, option, optional=False):
 
 def signal_handler(signal, frame):
     logging.info('You pressed Ctrl+C, exiting gracefully!')
-    global notifier
     if notifier:
         notifier.stop()
     if bot:
