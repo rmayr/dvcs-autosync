@@ -26,7 +26,7 @@ __website__ = 'http://www.mayrhofer.eu.org/dvcs-autosync'
 __license__ = 'GPL v2 or v3'
 
 # Imports for various platforms and error handling concerning optional Python modules
-import warnings, sys, signal, os, time, subprocess, threading, fnmatch, ConfigParser, logging
+import warnings, sys, os, time, subprocess, threading, fnmatch, ConfigParser, logging
 
 # OS detection
 detected_os = False
@@ -696,21 +696,6 @@ def config_get (section, option, optional=False):
         sys.exit(2)
     return ret
 
-
-def signal_handler(signal, frame):
-    logging.info('You pressed Ctrl+C, exiting gracefully!')
-    if notifier:
-        notifier.stop()
-    if bot:
-        bot.stop_serving()
-
-    # also remove the pidfile after a clean shutdown
-    if pidfile and os.path.exists(pidfile):
-	os.remove(pidfile)
-        
-    sys.exit(0)
-
-
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s%(levelname)s:%(name)s:%(message)s')
     
@@ -844,8 +829,6 @@ if __name__ == '__main__':
     ignoreabsolutepaths = [os.path.normpath(path + os.sep + ignorepath) for ignorepath in ignorepaths.split()]
     logging.info('Adding list to inotify exclude filter: %s', ignoreabsolutepaths)
 
-    signal.signal(signal.SIGINT, signal_handler)
-
     if syncmethod == 'xmpp':
 	username = config_get('xmpp', 'username')
 	password = config_get('xmpp', 'password')
@@ -906,5 +889,18 @@ if __name__ == '__main__':
     
     logging.info('----------------------------------------------------------------')
 
-    while True:
-        time.sleep(10)
+    try:
+        while True:
+            time.sleep(10)
+    except KeyboardInterrupt:
+        logging.info('You pressed Ctrl+C, exiting gracefully!')
+
+    if notifier:
+        notifier.stop()
+    if bot:
+        bot.stop_serving()
+
+    # also remove the pidfile after a clean shutdown
+    if pidfile and os.path.exists(pidfile):
+        os.remove(pidfile)
+    sys.exit(0)
