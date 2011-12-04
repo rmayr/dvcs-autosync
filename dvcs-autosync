@@ -50,7 +50,6 @@ if not detected_os:
     logging.error('Unsupported OS, sorry.')
     sys.exit(2)
 
-
 if not hasattr(subprocess, 'check_output'):
     # see https://gist.github.com/839684
     def check_output(*popenargs, **kwargs):
@@ -78,44 +77,25 @@ with warnings.catch_warnings():
     from jabberbot import botcmd
 
 # some global variables, will be initialized in main
-desktopnotifykde = False
-desktopnotifygnome = False
-desktopnotifygrowl = False
 xmppnotify = False
-knotify = None
 notifier = None
-gnotify = None
 bot = None
 hostname = None
 username = None
 pidfile = None
-icon = None
+
+desktop_notifiers = []
 
 def printmsg(title, msg, level=logging.INFO):
-    # there are probably more levels but I couldn't find the appropriate docs
-    kdelevels = {logging.DEBUG: 'info',
-                 logging.INFO: 'info',
-                 logging.WARNING: 'warning',
-                 logging.ERROR: 'warning',
-                 logging.CRITICAL: 'warning'}
+    for desktop_notifier in desktop_notifiers:
+        try:
+            # Way too much notifications are created for it to be reasonable to
+            # require the user to close all notifications. Hence the 5 second
+            # timeout.
+            desktop_notifier.notify(level, title, msg, timeout=5)
+        except:
+            pass
     try:
-        if desktopnotifygnome:
-            urgencies = {logging.DEBUG: pynotify.URGENCY_LOW,
-                         logging.INFO: pynotify.URGENCY_NORMAL,
-                         logging.WARNING: pynotify.URGENCY_CRITICAL,
-                         logging.ERROR: pynotify.URGENCY_CRITICAL,
-                         logging.CRITICAL: pynotify.URGENCY_CRITICAL}
-            n = pynotify.Notification(title, msg)
-            if icon:
-		n.set_icon_from_pixbuf(icon)
-            n.set_urgency(urgencies[level])
-            n.show()
-        elif desktopnotifykde:
-            knotify.event(kdelevels[level], 'kde', [], title, msg, [], [], 0, dbus_interface="org.kde.KNotify")
-        elif desktopnotifygrowl:
-            gnotify.notify("Every notifications", title, msg, gnotifyIcon)
-            time.sleep(0.1) # When sending multiple notifications at the same time, Growl seems to only consider the latest. This little delay prevent that.
-
         if xmppnotify and bot and alsonotify:
             bot.send(alsonotify, '[%s]: %s' % (title, msg))
     except:
@@ -734,46 +714,6 @@ def signal_handler(signal, frame):
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s%(levelname)s:%(name)s:%(message)s')
     
-    # try to set up desktop notification, first for KDE4, then for Gnome
-    # the signature is not correct, so rely on pynotify only at the moment
-    #try:
-	#import dbus
-	#knotify = dbus.SessionBus().get_object("org.kde.knotify", "/Notify")
-	#knotify.event("warning", "autosync application", [],
-	    #'KDE4 notification initialized', 'Initialized KDE4 desktop notification via DBUS',
-	    #[], [], 0, dbus_interface='org.kde.KNotify')
-	#desktopnotifykde = True
-    #except:
-	#print 'KDE4 KNotify does not seem to run or dbus is not installed'
-    try:
-        import pynotify, gtk
-        try:
-	    icon = gtk.IconTheme().load_icon('dvcs-autosync', 48, gtk.ICON_LOOKUP_GENERIC_FALLBACK)
-	except:
-	    icon = None
-        if pynotify.init('autosync application'):
-            logging.info('pynotify initialized successfully, will use desktop notifications')
-            desktopnotifygnome = True
-        else:
-            logging.warning('there was a problem initializing the pynotify module')
-    except:
-        logging.info('pynotify does not seem to be installed')
-
-    try:
-        import Growl
-        gnotifyImagePath = os.path.abspath('/usr/share/icons/hicolor/48x48/apps/dvcs-autosync.png')
-        if os.path.exists(gnotifyImagePath):
-            gnotifyIcon = Growl.Image.imageFromPath(gnotifyImagePath)
-        else:
-            gnotifyIcon = None
-        gnotify = Growl.GrowlNotifier( "AutoSync", ["Every notifications"], applicationIcon=gnotifyIcon)
-        gnotify.register()
-        logging.info('Growl initialized successfully, will use desktop notifications')
-        desktopnotifygrowl = True
-    except:
-        logging.info('Growl does not seem to be installed')
-
-
     config = ConfigParser.RawConfigParser()
     defaultcfgpath = os.path.expanduser('~/.autosync')
     if len(sys.argv) >= 2:
@@ -831,22 +771,39 @@ if __name__ == '__main__':
 	logging.info('Using only desktop notification')
     elif notifymethod == 'xmpp':
 	xmppnotify = True
-	desktopnotifygnome = False
-	desktopnotifykde = False
-	desktopnotifygrowl = False
 	logging.info('Using only XMPP notification')
     elif notifymethod == 'all':
 	xmppnotify = True
 	logging.info('Using all notification methods')
     elif notifymethod == 'none':
 	xmppnotify = False
-	desktopnotifygnome = False
-	desktopnotifykde = False
-	desktopnotifygrowl = False
 	logging.info('Disabling all notification methods, will only log to console')
     else:
 	logging.warning('Unknown notifymethod "%s" configured, will keep default (desktop)', notifymethod)
     
+    if not notifymethod or notifymethod in ('desktop', 'all'):
+        # Support for desktop notifications
+        import desktopnotify
+
+        try:
+            desktop_notifiers.append(desktopnotify.KNotify())
+            logging.debug('KNotify initialized successfully, will use desktop notifications')
+        except:
+            logging.debug('KDE4 KNotify does not seem to run or dbus is not installed')
+
+        try:
+            desktop_notifiers.append(desktopnotify.PyNotify('autosync application'))
+            desktop_notifiers[-1].load_icon('dvcs-autosync', 48)
+            logging.debug('PyNotify initialized successfully, will use desktop notifications')
+        except:
+            logging.debug('PyNotify does not seem to be installed or intialization failed')
+
+        try:
+            desktop_notifiers.append(desktopnotify.GrowlNotifier('AutoSync', ['Every notifications'], applicationIcon=os.path.abspath('/usr/share/icons/hicolor/48x48/apps/dvcs-autosync.png')))
+            logging.debug('Growl initialized successfully, will use desktop notifications')
+        except:
+            logging.debug('Growl does not seem to be installed')
+
     pulllock = config_get('autosync', 'pulllock')
     if pulllock == 'conservative':
         conservative_pull_lock = True
