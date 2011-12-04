@@ -75,9 +75,7 @@ with warnings.catch_warnings():
     # TODO: remove when we no longer need this
     sys.path.insert(0, '/usr/share/dvcs-autosync')
     import jabberbot, xmpp
-
-
-botcmd = jabberbot.botcmd
+    from jabberbot import botcmd
 
 # some global variables, will be initialized in main
 desktopnotifykde = False
