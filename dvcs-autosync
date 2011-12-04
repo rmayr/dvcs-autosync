@@ -805,9 +805,9 @@ if __name__ == '__main__':
     # does the file already exist?
     if os.access(pidfile, os.F_OK):
 	# check if a process with that PID is still running
-	pidfd = open(pidfile)
-	pidfd.seek(0)
-        old_pid = pidfd.readline()
+        with open(pidfile) as pidfd:
+            pidfd.seek(0)
+            old_pid = pidfd.readline()
         # Now we check the PID from lock file matches to the current
         # process PID
         if os.path.exists("/proc/%s" % old_pid):
@@ -818,9 +818,8 @@ if __name__ == '__main__':
 	    os.remove(pidfile)
     # if we get to here, process is not running and pidfile doesn't exist (anymore)
     cur_pid = str(os.getpid())
-    pidfd = open(pidfile, 'w')
-    pidfd.write(cur_pid)
-    pidfd.close()
+    with open(pidfile, 'w') as pidfd:
+        pidfd.write(cur_pid)
     
     ignorepaths = config_get('autosync', 'ignorepath')
     readfrequency = int(config_get('autosync', 'readfrequency'))
@@ -877,9 +876,8 @@ if __name__ == '__main__':
     ignorefile = os.path.join(path, '.gitignore')
     # load the patterns and match them internally with fnmatch
     if os.path.exists(ignorefile):
-        f = open(ignorefile, 'r')
-        ignorefilepatterns = [pat.strip() for pat in f.readlines()]
-        f.close()
+        with (ignorefile, 'r') as f:
+            ignorefilepatterns = [pat.strip() for pat in f.readlines()]
     else:
         ignorefilepatterns = []
     # (unfortunately, can't use pyinotify.ExcludeFilter, because this expects regexes (which .gitignore doesn't support))
