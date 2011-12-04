@@ -103,90 +103,6 @@ def printmsg(title, msg, level=logging.INFO):
 
     logging.log(level, "NOTIFICATION: %s: %s" % (title, msg))
 
-
-# this helper class has been shamelessly copied from http://socialwire.ca/2010/01/python-resettable-timer-example/
-class ResettableTimer(threading.Thread):
-    """
-    The ResettableTimer class is a timer whose counting loop can be reset
-    arbitrarily. Its duration is configurable. Commands can be specified
-    for both expiration and update. Its update resolution can also be
-    specified. Resettable timer keeps counting until the "run" method
-    is explicitly killed with the "kill" method.
-    """
-    def __init__(self, maxtime, expire, inc=None, update=None, arg=None):
-        """
-        @param maxtime: time in seconds before expiration after resetting
-                        in seconds
-        @param expire: function called when timer expires
-        @param inc: amount by which timer increments before
-                    updating in seconds, default is maxtime/2
-        @param update: function called when timer updates
-        @param arg: arbitrary argument that will be passed to function expire when timer expires 
-        """
-        self.maxtime = maxtime
-        self.expire = expire
-        if inc:
-            self.inc = inc
-        else:
-            self.inc = maxtime / 2
-        if update:
-            self.update = update
-        else:
-            self.update = lambda c : None
-
-        self.arg = arg
-        self.counter = 0
-        self.active = True
-        self.stop = False
-        threading.Thread.__init__(self)
-        self.setDaemon(True)
-        
-    def set_counter(self, t):
-        """
-        Set self.counter to t.
-
-        @param t: new counter value
-        """
-        self.counter = t
-        
-    def deactivate(self):
-        """
-        Set self.active to False.
-        """
-        self.active = False
-        
-    def kill(self):
-        """
-        Will stop the counting loop before next update.
-        """
-        self.stop = True
-        
-    def reset(self):
-        """
-        Fully rewinds the timer and makes the timer active, such that
-        the expire and update commands will be called when appropriate.
-        """
-        self.counter = 0
-        self.active = True
-
-    def run(self):
-        """
-        Run the timer loop.
-        """
-        while True:
-            self.counter = 0
-            while self.counter < self.maxtime:
-                self.counter += self.inc
-                time.sleep(self.inc)
-                if self.stop:
-                    return
-                if self.active:
-                    self.update(self.counter)
-            if self.active:
-                self.active = False
-                self.expire(self.arg)
-
-
 class AutosyncJabberBot(jabberbot.JabberBot):
     def __init__(self, username, password, res=None, debug=False, ignoreownmsg=True):
         self._running = False
@@ -343,11 +259,10 @@ class FileChangeHandler():
             # then these changes will be pushed in one go
             if self._push_timer and self._push_timer.is_alive():
                 logging.debug('Resetting already active push timer to new timeout of %s seconds until push would occur', readfrequency)
-                self._push_timer.reset()
-            else:
-                logging.debug('Starting push timer with %s seconds until push would occur (if no other changes happen in between)', readfrequency)
-                self._push_timer = ResettableTimer(maxtime=readfrequency, expire=self._real_push, inc=1, update=self.timer_tick)
-                self._push_timer.start()
+                self._push_timer.cancel()
+            logging.debug('Starting push timer with %s seconds until push would occur (if no other changes happen in between)', readfrequency)
+            self._push_timer = threading.Timer(readfrequency, self._real_push)
+            self._push_timer.start()
         else:
             logging.debug('%s reported that there is nothing to commit, not touching commit timer' % cmd_commit.split(' ')[0])
 
@@ -375,16 +290,13 @@ class FileChangeHandler():
             self._file_events[curpath][0].append((event.maskname, action))
             if self._file_events[curpath][1] and self._file_events[curpath][1].is_alive():
                 logging.debug('Resetting already active coalesce timer to new timeout of %s seconds until coalescing events for file %s would occur', coalesce_seconds, curpath)
-                self._file_events[curpath][1].reset()
+                self._file_events[curpath][1].cancel()
             else:
                 logging.debug('Starting coalesce timer with %s seconds until coalescing events for file %s would occur (if no other changes happen in between)', coalesce_seconds, curpath)
-                self._file_events[curpath][1] = ResettableTimer(maxtime=coalesce_seconds, expire=self._filter_and_handle_actions, inc=1, arg=[curpath, parms])
-                self._file_events[curpath][1].start()
+            self._file_events[curpath][1] = threading.Timer(coalesce_seconds, self._filter_and_handle_actions, (curpath, parms))
+            self._file_events[curpath][1].start()
             
-    def _filter_and_handle_actions(self, args):
-        curpath = args[0]
-        parms = args[1]
-            
+    def _filter_and_handle_actions(self, curpath, parms):
         logging.info('Coalesce event triggered for file %s', curpath)
         with lock:
             logging.debug('Considering file %s, which has the following events recorded:', curpath)
@@ -426,16 +338,13 @@ class FileChangeHandler():
             self._exec_cmd(lastaction, parms)
             self._post_action_steps(curpath)
             
-    def timer_tick(self, counter):
-        logging.debug('Tick %d / %d' % (counter, self._push_timer.maxtime))
-
     def startup(self):
         with lock:
             logging.info('Running startup command to check for local changes now: %s', cmd_startup)
             self._exec_cmd(cmd_startup)
             self._post_action_steps()
 
-    def _real_push(self, arg):
+    def _real_push(self):
         proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
         (remoteurl, errors) = proc.communicate()
         printmsg('Pushing changes', 'Pushing last local changes to remote repository %s' % remoteurl)
@@ -660,6 +569,7 @@ def initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfreque
     wm = pyinotify.WatchManager()
     # TODO: frequency doesn't work....
     notifier = pyinotify.ThreadedNotifier(wm, LinuxFileChangeHandlerAdapter(handler = handler), read_freq=readfrequency)
+    notifier.daemon = True
     #notifier = pyinotify.ThreadedNotifier(wm, handler)
     # coalescing events needs pyinotify >= 0.9, so make this optional
     try:
@@ -889,6 +799,7 @@ if __name__ == '__main__':
     
     logging.info('----------------------------------------------------------------')
 
+    # FIXME: Why run the file event notification loop in a separate thread if we're not using the main one?
     try:
         while True:
             time.sleep(10)
