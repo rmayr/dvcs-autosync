@@ -28,27 +28,7 @@ __license__ = 'GPL v2 or v3'
 # Imports for various platforms and error handling concerning optional Python modules
 import warnings, sys, os, time, subprocess, threading, fnmatch, ConfigParser, logging
 
-# OS detection
-detected_os = False
-try:
-    import pyinotify
-    detected_os = "LINUX"
-except:
-    pass
-try:
-    import win32api
-    detected_os = "WINDOWS"
-except:
-    pass
-try:
-    from fsevents import Observer
-    from fsevents import Stream
-    detected_os = "MAC_OS"
-except:
-    pass
-if not detected_os:
-    logging.error('Unsupported OS, sorry.')
-    sys.exit(2)
+from filenotifier import Notifier
 
 if not hasattr(subprocess, 'check_output'):
     # see https://gist.github.com/839684
@@ -245,13 +225,13 @@ class FileChangeHandler():
     def _post_action_steps(self, curpath = None):
         with lock:
             # the status command should return 0 when nothing has changed
-            retcode = subprocess.call(cmd_status, cwd=self.cwd, shell=True)
+            retcode = subprocess.call(cmds['status'], cwd=self.cwd, shell=True)
             if retcode != 0:
                 if curpath:
                     commitmsg = 'Autocommit of file %s changed on host %s' % (curpath, hostname)
                 else:
                     commitmsg = 'Autocommit of all changes since last autosync startup on host %s' % hostname
-                self._exec_cmd(cmd_commit, [commitmsg])
+                self._exec_cmd(cmds['commit'], [commitmsg])
 
         if retcode != 0 and syncmethod != 'none':
             # reset the timer and start in case it is not yet running (start should be idempotent if it already is)
@@ -264,7 +244,7 @@ class FileChangeHandler():
             self._push_timer = threading.Timer(readfrequency, self._real_push)
             self._push_timer.start()
         else:
-            logging.debug('%s reported that there is nothing to commit, not touching commit timer' % cmd_commit.split(' ')[0])
+            logging.debug('%s reported that there is nothing to commit, not touching commit timer' % cmds['commit'].split(' ')[0])
 
     def _queue_action(self, event, action, parms, act_on_dirs=False):
         curpath = event.pathname
@@ -287,7 +267,7 @@ class FileChangeHandler():
             if not self._file_events.has_key(curpath):
                 self._file_events[curpath] = [list(), None]
             # and each entry in the list is a tuple of event name and associated action
-            self._file_events[curpath][0].append((event.maskname, action))
+            self._file_events[curpath][0].append((event.maskname, cmds[action]))
             if self._file_events[curpath][1] and self._file_events[curpath][1].is_alive():
                 logging.debug('Resetting already active coalesce timer to new timeout of %s seconds until coalescing events for file %s would occur', coalesce_seconds, curpath)
                 self._file_events[curpath][1].cancel()
@@ -317,7 +297,7 @@ class FileChangeHandler():
                 # special case: rm then add --> modify
                 if lastevent == 'IN_DELETE' and eventtype == 'IN_CREATE':
                     lastevent = 'IN_MODIFY'
-                    lastaction = cmd_modify
+                    lastaction = cmds['modify']
                     break
                 
                 # priority ordering 
@@ -340,12 +320,12 @@ class FileChangeHandler():
             
     def startup(self):
         with lock:
-            logging.info('Running startup command to check for local changes now: %s', cmd_startup)
-            self._exec_cmd(cmd_startup)
+            logging.info('Running startup command to check for local changes now: %s', cmds['startup'])
+            self._exec_cmd(cmds['startup'])
             self._post_action_steps()
 
     def _real_push(self):
-        proc = subprocess.Popen(cmd_remoteurl.split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
+        proc = subprocess.Popen(cmds['remoteurl'].split(' '), stdout=subprocess.PIPE, cwd=self.cwd)
         (remoteurl, errors) = proc.communicate()
         printmsg('Pushing changes', 'Pushing last local changes to remote repository %s' % remoteurl)
         
@@ -356,7 +336,7 @@ class FileChangeHandler():
             #    git fetch --dry-run | grep "Unpacking objects:
             # might help
             #self.protected_pull()
-            self._exec_cmd(cmd_push)
+            self._exec_cmd(cmds['push'])
 
         # and try to notify other instances
         if bot:
@@ -374,7 +354,7 @@ class FileChangeHandler():
             self._ignore_events = True
 
         with lock:
-            handler._exec_cmd(cmd_pull)
+            handler._exec_cmd(cmds['push'])
 
         if conservative_pull_lock:
             # pull done, now start handling events again
@@ -383,211 +363,6 @@ class FileChangeHandler():
             # pull ran and we weren't listening by simply doing the startup 
             # sequence again
             self.startup()
-
-
-# The definition of this class has to be OS arbitrated because pyinotify can't be
-# imported under windows and inheriting from pyinotify.ProcessEvent needs it...
-if detected_os == "LINUX":
-    class LinuxFileChangeHandlerAdapter(pyinotify.ProcessEvent):
-        def my_init(self, handler):
-            self.handler = handler
-
-        def process_IN_DELETE(self, event):
-            # sanity check - don't remove file if it still exists in the file system!
-            if os.path.exists(event.pathname):
-                logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
-                return
-             
-            self.handler._queue_action(event, cmd_rm, [event.pathname])
-
-        def process_IN_CREATE(self, event):
-	    # sanity check - don't add file if it (no longer) exists in the file system!
-	    if not os.path.exists(event.pathname):
-		logging.debug('Ignoring file create event on %s, as it (no longer) exists - it was probably created as a temporary file and immediately removed by the application', event.pathname)
-		return
-
-	    self.handler._queue_action(event, cmd_add, [event.pathname])
-
-        def process_IN_MODIFY(self, event):
-            self.handler._queue_action(event, cmd_modify, [event.pathname])
-
-        def process_IN_CLOSE_WRITE(self, event):
-            self.handler._queue_action(event, cmd_modify, [event.pathname])
-
-        def process_IN_ATTRIB(self, event):
-            self.handler._queue_action(event, cmd_modify, [event.pathname])
-
-        def process_IN_MOVED_TO(self, event):
-            try:
-                if event.src_pathname:
-                    logging.debug('Detected moved file from %s to %s', event.src_pathname, event.pathname)
-                    self._handler.queue_action(event, cmd_move, [event.src_pathname, event.pathname], act_on_dirs=True)
-                else:
-                    logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
-                    self.handler._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
-            except AttributeError:
-                # we don't even have the attribute in the event, so also add
-                logging.debug('Moved file to %s, but unknown source, will simply add new file', event.pathname)
-                self.handler._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
-
-
-if detected_os == "WINDOWS":
-    class WindowsFileChangeHandlerAdapter(threading.Thread):
-	def __init__(self, path, ignoreabsolutepaths, handler):
-	    threading.Thread.__init__(self)
-	    self.handler = handler
-	    self.ignoreabsolutepaths = ignoreabsolutepaths
-	    self.path = path
-
-	# This is to mimic the event-type of inotify
-	class MyEvent():
-	    def __init__(self, dir, pathname, action):
-		self.dir = dir
-		self.pathname = pathname
-		self.maskname = [ "", "IN_CREATE", "IN_DELETE", "IN_MODIFY", "IN_DELETE", "IN_CREATE"][action]
-
-	def run(self):
-	    import win32file, win32con
-
-	    FILE_LIST_DIRECTORY = 0x0001
-
-	    path_to_watch = self.path
-	    hDir = win32file.CreateFile (
-	      path_to_watch,
-	      FILE_LIST_DIRECTORY,
-	      win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE,
-	      None,
-	      win32con.OPEN_EXISTING,
-	      win32con.FILE_FLAG_BACKUP_SEMANTICS,
-	      None
-	    )
-
-	    while 1:
-		results = win32file.ReadDirectoryChangesW (
-			hDir,
-			1024,
-			True,
-			win32con.FILE_NOTIFY_CHANGE_FILE_NAME |
-			win32con.FILE_NOTIFY_CHANGE_DIR_NAME |
-			win32con.FILE_NOTIFY_CHANGE_ATTRIBUTES |
-			win32con.FILE_NOTIFY_CHANGE_SIZE |
-			win32con.FILE_NOTIFY_CHANGE_LAST_WRITE |
-			win32con.FILE_NOTIFY_CHANGE_SECURITY,
-			None,
-			None
-			)
-		for action, file in results:
-		    full_filename = os.path.join (path_to_watch, file)
-
-		    #check if this file is ignored:
-		    if True in [x in full_filename for x in self.ignoreabsolutepaths]:
-			continue
-
-		    event = self.MyEvent(os.path.isdir(file), file, action)
-		    if action == 1 or action == 5: #CREATE or MOVE_TO
-			self.handler._queue_action(event, cmd_add, [event.pathname])
-		    elif action == 2 or action == 4: #DELETE or MOVE_FROM
-			if os.path.exists(event.pathname):
-			    logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
-			    continue
-			self.handler._queue_action(event, cmd_rm, [event.pathname])
-		    elif action == 3: #MODIFY:
-			self.handler._queue_action(event, cmd_modify, [event.pathname])
-
-
-if detected_os == "MAC_OS":
-    class MacOSFileChangeHandlerAdapter(threading.Thread):
-    	def __init__(self, path, ignoreabsolutepaths, handler):
-    	    threading.Thread.__init__(self)
-    	    self.handler = handler
-    	    self.ignoreabsolutepaths = ignoreabsolutepaths
-    	    self.path = path
-    
-    	# This is to mimic the event-type of inotify
-    	class MyEvent():
-    	    def __init__(self, dir, pathname, action):
-    		self.dir = dir
-    		self.pathname = pathname
-    		masks = {   # from doc : http://developer.apple.com/library/mac/#documentation/Darwin/Reference/FSEvents_Ref/FSEvents_h/index.html#HeaderDoc_enums
-    		            256:"IN_CREATE", # created
-    		            512:"IN_DELETE", # removed
-    		            # in doc, but don't seem to be used, included to prevent potential bug
-    		            2048:"IN_MODIFY", # renamed
-    		            4096:"IN_MODIFY", # modified
-    		            0x00000400:'InodeMetaMod',
-    		            0x00002000:'FinderInfoMod',
-    		            0x00004000:'ChangeOwner',
-    		            0x00008000:'XattrMod',
-    		            # not in doc, but actually used
-    		            64:"IN_DELETE", # before rename
-    		            128:"IN_CREATE", # after rename
-    		            2:"IN_MODIFY",
-    		        }
-    		self.maskname = masks[action]
-    		print self.maskname
-        
-        def __call__(self, event):
-            for ignoreabsolutepath in self.ignoreabsolutepaths:
-                if event.name.startswith(ignoreabsolutepath):
-                    return
-                    
-            event = self.MyEvent(os.path.isdir(event.name), event.name, event.mask)
-            
-            if event.maskname == "IN_CREATE": #CREATE or MOVE_TO
-                self.handler._queue_action(event, cmd_add, [event.pathname], act_on_dirs=True)
-            elif event.maskname == "IN_DELETE": #DELETE or MOVE_FROM
-                if os.path.exists(event.pathname):
-                    logging.debug('Ignoring file delete event on %s, as it still exists - it was probably immediately re-created by the application', event.pathname)
-                    return
-                self.handler._queue_action(event, cmd_rm, [event.pathname], act_on_dirs=True)
-            elif event.maskname == "IN_MODIFY": #MODIFY:
-                self.handler._queue_action(event, cmd_modify, [event.pathname], act_on_dirs=True)
-        
-    	def run(self):
-    	    
-    	    observer = Observer()
-            observer.start()
-
-            #handler = self.process_event(self)
-            
-            stream = Stream(self, self.path, file_events=True)
-            observer.schedule(stream)
-
-
-def initialize_win32notify(path, ignoreabsolutepaths, handler): # Windows
-    adapter = WindowsFileChangeHandlerAdapter(path, ignoreabsolutepaths, handler)
-    adapter.daemon = True
-    adapter.start()
-
-def initialize_fsevents(path, ignoreabsolutepaths, handler): # Mac OS
-    adapter = MacOSFileChangeHandlerAdapter(path, ignoreabsolutepaths, handler)
-    adapter.daemon = True
-    adapter.start()
-
-def initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfrequency, handler): # Linux
-    excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
-    wm = pyinotify.WatchManager()
-    # TODO: frequency doesn't work....
-    notifier = pyinotify.ThreadedNotifier(wm, LinuxFileChangeHandlerAdapter(handler = handler), read_freq=readfrequency)
-    notifier.daemon = True
-    #notifier = pyinotify.ThreadedNotifier(wm, handler)
-    # coalescing events needs pyinotify >= 0.9, so make this optional
-    try:
-        notifier.coalesce_events()
-    except AttributeError as e:
-        logging.warning('Cannot coalesce events, pyinotify does not seem to support it (maybe too old): %s', e)
-    mask = pyinotify.IN_DELETE | pyinotify.IN_CREATE | pyinotify.IN_CLOSE_WRITE | pyinotify.IN_ATTRIB | pyinotify.IN_MOVED_FROM | pyinotify.IN_MOVED_TO | pyinotify.IN_DONT_FOLLOW | pyinotify.IN_ONLYDIR
-    try:
-        logging.debug('Adding recursive, auto-adding watch for path %s with event mask %d', path, mask)
-        wd = wm.add_watch(path, mask, rec=True, auto_add=True, quiet=False, exclude_filter=excl)
-        if wd <= 0:
-            logging.warning('Unable to add watch for path %s - this will not work', path)
-    except pyinotify.WatchManagerError, e:
-        logging.warning("pyinotify.WatchManagerError: %s, %s", e, e.wmd)
-
-    logging.info('Start monitoring %s (type c^c to exit)', path)
-    notifier.start()
-
 
 def config_get (section, option, optional=False):
     ret = None
@@ -711,16 +486,18 @@ if __name__ == '__main__':
         sys.exit(100)    
     
     # Read required DVCS commands
-    cmd_status = config_get('dvcs', 'statuscmd')
-    cmd_startup = config_get('dvcs', 'startupcmd')
-    cmd_commit = config_get('dvcs', 'commitcmd')
-    cmd_push = config_get('dvcs', 'pushcmd')
-    cmd_pull = config_get('dvcs', 'pullcmd')
-    cmd_add = config_get('dvcs', 'addcmd')
-    cmd_rm = config_get('dvcs', 'rmcmd')
-    cmd_modify = config_get('dvcs', 'modifycmd')
-    cmd_move = config_get('dvcs', 'movecmd')
-    cmd_remoteurl = config_get('dvcs', 'remoteurlcmd')
+    cmds = {
+            'status':       config_get('dvcs', 'statuscmd'),
+            'startup':      config_get('dvcs', 'startupcmd'),
+            'commit':       config_get('dvcs', 'commitcmd'),
+            'push':         config_get('dvcs', 'pushcmd'),
+            'pull':         config_get('dvcs', 'pullcmd'),
+            'add':          config_get('dvcs', 'addcmd'),
+            'rm':           config_get('dvcs', 'rmcmd'),
+            'modify':       config_get('dvcs', 'modifycmd'),
+            'move':         config_get('dvcs', 'movecmd'),
+            'remoteurl':    config_get('dvcs', 'remoteurlcmd'),
+        }
     
     # TODO: this is currently git-specific, should be configurable
     ignorefile = os.path.join(path, '.gitignore')
@@ -746,12 +523,14 @@ if __name__ == '__main__':
 	if xmppnotify and not alsonotify:
 	    logger.warning('XMPP notification requested, but alsonotify option not configured, will not send XMPP notifications')
 
-	if (detected_os == "LINUX") or (detected_os == "MAC_OS"):
-	    hostname = os.uname()[1]
-	elif detected_os == "WINDOWS":
-	    hostname = win32api.GetComputerName()
-	else:
-	    hostname = "UNSUPPORTED_OS"
+        try:
+            import win32api
+            hostname = win32api.GetComputerName()
+        except:
+            try:
+                hostname = os.uname()[1]
+            except:
+                hostname = "UNSUPPORTED_OS"
 	
 	res = 'AutosyncJabberBot on %s' % hostname
 	try:
@@ -780,14 +559,7 @@ if __name__ == '__main__':
     # this is a central lock for guarding repository operations
     lock = threading.RLock()
 
-    if detected_os == "LINUX":
-        initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfrequency, handler)
-    elif detected_os == "WINDOWS":
-        initialize_win32notify(path, ignoreabsolutepaths, handler)
-    elif detected_os == "MAC_OS":
-        initialize_fsevents(path, ignoreabsolutepaths, handler)
-    else:
-        pass #TODO
+    notifier = Notifier(path, ignoreabsolutepaths, ignorefilepatterns, handler, readfrequency)
 
     logging.info('Executing startup synchronizaion')
     if syncmethod != 'none':
@@ -799,10 +571,11 @@ if __name__ == '__main__':
     
     logging.info('----------------------------------------------------------------')
 
-    # FIXME: Why run the file event notification loop in a separate thread if we're not using the main one?
     try:
         while True:
-            time.sleep(10)
+            notifier.process_events()
+            notifier.check_events()
+            notifier.read_events()
     except KeyboardInterrupt:
         logging.info('You pressed Ctrl+C, exiting gracefully!')
 
