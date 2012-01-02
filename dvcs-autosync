@@ -779,7 +779,7 @@ if __name__ == '__main__':
     config = ConfigParser.RawConfigParser()
     defaultcfgpath = os.path.expanduser('~/.autosync')
     if len(sys.argv) >= 2:
-        config_locations = [sys.argv[1], defaultcfgpath]
+        config_locations = [defaultcfgpath, sys.argv[1]]
     else:
         config_locations = [defaultcfgpath]
     read_configfiles = config.read(config_locations)
