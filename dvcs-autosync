@@ -898,7 +898,7 @@ if __name__ == '__main__':
 	password = config_get('xmpp', 'password')
 	alsonotify = config_get('xmpp', 'alsonotify', optional=True)
 	if xmppnotify and not alsonotify:
-	    logger.warning('XMPP notification requested, but alsonotify option not configured, will not send XMPP notifications')
+	    logging.warning('XMPP notification requested, but alsonotify option not configured, will not send XMPP notifications')
 
 	if (detected_os == "LINUX") or (detected_os == "MAC_OS"):
 	    hostname = os.uname()[1]
