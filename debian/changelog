@@ -1,3 +1,10 @@
+dvcs-autosync (0.6) unstable; urgency=low
+
+  * Code refactoring for better modularization and minor shutdown and
+    logging fixes.
+
+ -- Rene Mayrhofer <rmayr@debian.org>  Fri, 17 Feb 2012 16:38:05 +0100
+
 dvcs-autosync (0.5.1) unstable; urgency=low
 
   * Depend on python (>= 2.6), as dvcs-autosync will not work with Python 2.5.
