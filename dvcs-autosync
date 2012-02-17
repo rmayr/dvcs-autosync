@@ -285,11 +285,13 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
     @botcmd
     def ping(self, mess, args):
+        """Ping command"""
         self.log.debug('Received ping command over Jabber channel')
         return 'pong'
         
     @botcmd
     def pushed(self, mess, args):
+        """push command"""
         self.log.debug('Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom()))
         if mess.getFrom() == str(self.jid) + '/' + self.res:
             self.log.debug('Ignoring own pushed message looped back by server')
@@ -681,6 +683,7 @@ def initialize_inotify(ignoreabsolutepaths, path, ignorefilepatterns, readfreque
     excl = pyinotify.ExcludeFilter(ignoreabsolutepaths)
     wm = pyinotify.WatchManager()
     # TODO: frequency doesn't work....
+    global notifier
     notifier = pyinotify.ThreadedNotifier(wm, LinuxFileChangeHandlerAdapter(handler = handler), read_freq=readfrequency)
     #notifier = pyinotify.ThreadedNotifier(wm, handler)
     # coalescing events needs pyinotify >= 0.9, so make this optional
@@ -728,7 +731,7 @@ def signal_handler(signal, frame):
 
     # also remove the pidfile after a clean shutdown
     if pidfile and os.path.exists(pidfile):
-	os.remove(pidfile)
+        os.remove(pidfile)
         
     sys.exit(0)
 
