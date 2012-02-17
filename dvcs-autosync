@@ -30,6 +30,10 @@ __license__ = 'GPL v2 or v3'
 # Imports for various platforms and error handling concerning optional Python modules
 import warnings, sys, os, time, subprocess, threading, fnmatch, ConfigParser, logging
 
+# need to use a private instance of jabberbot for now...
+# TODO: remove when we no longer need this, but then need to properly install the other private modules
+sys.path.insert(0, '/usr/share/dvcs-autosync')
+
 from filenotifier import Notifier
 
 if not hasattr(subprocess, 'check_output'):
@@ -52,9 +56,6 @@ if not hasattr(subprocess, 'check_output'):
 # do not care about deprecation warnings right now, as they are only confusing for users
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore",category=DeprecationWarning)
-    # need to use a private instance of jabberbot for now...
-    # TODO: remove when we no longer need this
-    sys.path.insert(0, '/usr/share/dvcs-autosync')
     import jabberbot, xmpp
     from jabberbot import botcmd
 
@@ -384,7 +385,7 @@ def config_get (section, option, optional=False):
     return ret
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s%(levelname)s:%(name)s:%(message)s')
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
     
     config = ConfigParser.RawConfigParser()
     defaultcfgpath = os.path.expanduser('~/.autosync')
