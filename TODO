@@ -16,6 +16,7 @@ TODO - short term:
 * optimize pulls and pushes during startup
 * implement optimistic pull lock for better performance
 * Find a good combination of global and file-based event coalescing. This would allow quick synchronization of files that are written and then not touched again while commits to files that are continiously being worked on would be kept in one (larger) commit. There are (at least) 2 use cases to take into account: copying/moving/removing whole directories that should be kept in one big commit and synced quickly, and one file being open in an editor application and being written to more or less continuously. In the latter case, we need to find a compromise between too many commits and to few (which is a problem when accidentally deleting text that was written an hour earlier and that should be recoverable).
+* Run the file event notification loop in the main thread
 
 TODO - future versions:
 -----------------------
