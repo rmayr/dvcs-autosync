@@ -1,3 +1,12 @@
+Version 0.6
+ * Minor fixes (logging typo and remove hardcoded /usr/share path in setup.py) 
+   from Adam Spiers.
+ * Reverse order of loading config files: first the default config, then the 
+   one passed on the command line, so that the latter may override variables 
+   from the former.
+ * Refactoring by Giel van Schijndel: Move desktop notification and file change
+   monitoring into own modules for better modularization. 
+
 Version 0.5
  * Added Windows and Mac OS/X ports (thanks to Philipp Tölke and Olivier 
    Guerriat, respectively, for the ports!).

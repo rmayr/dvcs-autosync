@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # ============================================================================
-# Copyright René Mayrhofer, 2010-2011
+# Copyright René Mayrhofer, 2010-2012
 #
 # Contributors:
 # * Dieter Plaetinck: documentation and bug fixes, launcher script, config
@@ -12,6 +12,8 @@
 # * Philipp Tölke: Windows port
 # * Olivier Guerriat : Mac OS port, Growl support
 # * evgeni@golov.de: Various bugfixes
+# * Giel van Schijndel: refactoring for better modularization of platform
+#   dependent code
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -21,7 +23,7 @@
 from __future__ import with_statement
 
 __author__ = 'René Mayrhofer <rene@mayrhofer.eu.org>'
-__version__ = '0.5'
+__version__ = '0.6'
 __website__ = 'http://www.mayrhofer.eu.org/dvcs-autosync'
 __license__ = 'GPL v2 or v3'
 
@@ -503,7 +505,7 @@ if __name__ == '__main__':
     ignorefile = os.path.join(path, '.gitignore')
     # load the patterns and match them internally with fnmatch
     if os.path.exists(ignorefile):
-        with (ignorefile, 'r') as f:
+        with open(ignorefile, 'r') as f:
             ignorefilepatterns = [pat.strip() for pat in f.readlines()]
     else:
         ignorefilepatterns = []

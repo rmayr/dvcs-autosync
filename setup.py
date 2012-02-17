@@ -41,7 +41,9 @@ setup(name=SCRIPT,
 
       scripts= [SCRIPT],
       # TODO: remove when we use the upstream Jabberbot
-      data_files = [('share/' + SCRIPT, ['jabberbot.py', 'autosync-xdg-launcher.sh']),
+      data_files = [('share/' + SCRIPT, ['jabberbot.py', 'filenotifier.py',
+                                         'desktopnotify.py', 
+                                         'autosync-xdg-launcher.sh']),
                     ('share/applications', [SCRIPT + '.desktop']),
                     ('share/icons/hicolor/8x8/apps', ['icons/8x8/dvcs-autosync.png']),
                     ('share/icons/hicolor/16x16/apps', ['icons/16x16/dvcs-autosync.png']),
