@@ -20,12 +20,12 @@ try:
             self.handler._queue_action(event, 'rm', [event.pathname])
 
         def process_IN_CREATE(self, event):
-	    # sanity check - don't add file if it (no longer) exists in the file system!
-	    if not os.path.exists(event.pathname):
-		logging.debug('Ignoring file create event on %s, as it (no longer) exists - it was probably created as a temporary file and immediately removed by the application', event.pathname)
-		return
+            # sanity check - don't add file if it (no longer) exists in the file system!
+            if not os.path.exists(event.pathname):
+                logging.debug('Ignoring file create event on %s, as it (no longer) exists - it was probably created as a temporary file and immediately removed by the application', event.pathname)
+                return
 
-	    self.handler._queue_action(event, 'add', [event.pathname])
+            self.handler._queue_action(event, 'add', [event.pathname])
 
         def process_IN_MODIFY(self, event):
             self.handler._queue_action(event, 'modify', [event.pathname])
@@ -95,32 +95,32 @@ try:
         EVT_MOVE_FROM = 4
         EVT_MOVE_TO = 5
 
-	def __init__(self, path, ignoreabsolutepaths, handler):
+        def __init__(self, path, ignoreabsolutepaths, handler):
             super(WindowsFileChangeHandlerAdapter, self).__init__()
-	    self.handler = handler
-	    self.ignoreabsolutepaths = ignoreabsolutepaths
-	    self.path = path
+            self.handler = handler
+            self.ignoreabsolutepaths = ignoreabsolutepaths
+            self.path = path
 
             self._eventq = deque()
-	    self.hDir = win32file.CreateFile(
-	      self.path,
-	      self.FILE_LIST_DIRECTORY,
-	      win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE,
-	      None,
-	      win32con.OPEN_EXISTING,
-	      win32con.FILE_FLAG_BACKUP_SEMANTICS,
-	      None
-	    )
+            self.hDir = win32file.CreateFile(
+              self.path,
+              self.FILE_LIST_DIRECTORY,
+              win32con.FILE_SHARE_READ | win32con.FILE_SHARE_WRITE,
+              None,
+              win32con.OPEN_EXISTING,
+              win32con.FILE_FLAG_BACKUP_SEMANTICS,
+              None
+            )
 
         def stop(self):
             self.hDir = None
 
-	# This is to mimic the event-type of inotify
-	class MyEvent():
-	    def __init__(self, dir, pathname, action):
-		self.dir = dir
-		self.pathname = pathname
-		self.maskname = [ "", "IN_CREATE", "IN_DELETE", "IN_MODIFY", "IN_DELETE", "IN_CREATE"][action]
+        # This is to mimic the event-type of inotify
+        class MyEvent():
+            def __init__(self, dir, pathname, action):
+                self.dir = dir
+                self.pathname = pathname
+                self.maskname = [ "", "IN_CREATE", "IN_DELETE", "IN_MODIFY", "IN_DELETE", "IN_CREATE"][action]
 
         def process_events(self):
             pass
@@ -175,34 +175,34 @@ try:
     import time
 
     class MacOSFileChangeHandlerAdapter(threading.Thread):
-    	def __init__(self, path, ignoreabsolutepaths, handler):
-    	    threading.Thread.__init__(self)
-    	    self.handler = handler
-    	    self.ignoreabsolutepaths = ignoreabsolutepaths
-    	    self.path = path
+        def __init__(self, path, ignoreabsolutepaths, handler):
+            threading.Thread.__init__(self)
+            self.handler = handler
+            self.ignoreabsolutepaths = ignoreabsolutepaths
+            self.path = path
     
-    	# This is to mimic the event-type of inotify
-    	class MyEvent():
-    	    def __init__(self, dir, pathname, action):
-    		self.dir = dir
-    		self.pathname = pathname
-    		masks = {   # from doc : http://developer.apple.com/library/mac/#documentation/Darwin/Reference/FSEvents_Ref/FSEvents_h/index.html#HeaderDoc_enums
-    		            256:"IN_CREATE", # created
-    		            512:"IN_DELETE", # removed
-    		            # in doc, but don't seem to be used, included to prevent potential bug
-    		            2048:"IN_MODIFY", # renamed
-    		            4096:"IN_MODIFY", # modified
-    		            0x00000400:'InodeMetaMod',
-    		            0x00002000:'FinderInfoMod',
-    		            0x00004000:'ChangeOwner',
-    		            0x00008000:'XattrMod',
-    		            # not in doc, but actually used
-    		            64:"IN_DELETE", # before rename
-    		            128:"IN_CREATE", # after rename
-    		            2:"IN_MODIFY",
-    		        }
-    		self.maskname = masks[action]
-    		print self.maskname
+        # This is to mimic the event-type of inotify
+        class MyEvent():
+            def __init__(self, dir, pathname, action):
+                self.dir = dir
+                self.pathname = pathname
+                masks = {   # from doc : http://developer.apple.com/library/mac/#documentation/Darwin/Reference/FSEvents_Ref/FSEvents_h/index.html#HeaderDoc_enums
+                            256:"IN_CREATE", # created
+                            512:"IN_DELETE", # removed
+                            # in doc, but don't seem to be used, included to prevent potential bug
+                            2048:"IN_MODIFY", # renamed
+                            4096:"IN_MODIFY", # modified
+                            0x00000400:'InodeMetaMod',
+                            0x00002000:'FinderInfoMod',
+                            0x00004000:'ChangeOwner',
+                            0x00008000:'XattrMod',
+                            # not in doc, but actually used
+                            64:"IN_DELETE", # before rename
+                            128:"IN_CREATE", # after rename
+                            2:"IN_MODIFY",
+                        }
+                self.maskname = masks[action]
+                print self.maskname
         
         def __call__(self, event):
             for ignoreabsolutepath in self.ignoreabsolutepaths:
@@ -221,9 +221,9 @@ try:
             elif event.maskname == "IN_MODIFY": #MODIFY:
                 self.handler._queue_action(event, 'modify', [event.pathname], act_on_dirs=True)
         
-    	def run(self):
-    	    
-    	    observer = Observer()
+        def run(self):
+            
+            observer = Observer()
             observer.start()
 
             #handler = self.process_event(self)
