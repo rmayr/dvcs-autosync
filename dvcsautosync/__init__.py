@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # ============================================================================
-# Copyright René Mayrhofer, 2012-
+# Copyright René Mayrhofer, 2012
 #
 # Contributors:
 # * Sebastian Spaeth: refactoring & cleanup
@@ -11,11 +11,26 @@
 # ============================================================================
 __all__ = ["Notifier", "jabberbot"]
 import warnings
+from sys import platform
 
-# Make 'Notifier' available
-from .filenotifier import Notifier
 # Make private copy of jabberbot available, disable deprecation warnings
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore",category=DeprecationWarning)
     from . import jabberbot
 
+# Make 'Notifier' available
+if platform.startswith('linux'):
+    try:
+        import pyinotify
+    except ImportError:        
+        # TODO: Do we have a generic fallback? We should use that then.
+        raise ImportError("Failed to import pyinotify. Please install python-"
+                          "inotify if you are on Linux.")
+    from .filenotifier_lin import Notifier
+elif platform.startswith('win'):
+    from .filenotifier_win import Notifier
+elif platform.startswith('darwin'):
+    from .filenotifier_mac import Notifier
+else:
+    raise Exception("Unknown OS. Please report this value to the "
+                    "dvcs-autosync developers: %s" % platform)
