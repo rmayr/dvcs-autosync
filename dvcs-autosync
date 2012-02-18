@@ -30,7 +30,13 @@ __license__ = 'GPL v2 or v3'
 # Imports for various platforms and error handling concerning optional Python modules
 import warnings, sys, os, time, subprocess, threading, fnmatch, ConfigParser, logging
 
-from dvcsautosync.filenotifier import Notifier
+from dvcsautosync import Notifier, jabberbot # private jabberbot copy for now
+
+# do not care about deprecation warnings right now, as they are only
+# confusing for users
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
+    import xmpp
 
 if not hasattr(subprocess, 'check_output'):
     # see https://gist.github.com/839684
@@ -48,13 +54,6 @@ if not hasattr(subprocess, 'check_output'):
         return output
     subprocess.check_output = check_output
 
-
-# do not care about deprecation warnings right now, as they are only confusing for users
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore",category=DeprecationWarning)
-    import xmpp
-    import dvcsautosync.jabberbot as jabberbot # private copy for now
-    from dvcsautosync.jabberbot import botcmd
 
 # some global variables, will be initialized in main
 xmppnotify = False
@@ -152,17 +151,17 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             self.log.warning('Received an error while trying to send message. Will send it later.')
             self._unsent.append((user, text, in_reply_to, message_type))
   
-    @botcmd
+    @jabberbot.botcmd
     def whoami(self, mess, args):
         """Tells you your username"""
         return 'You are %s, I am %s/%s' % (mess.getFrom(), self.jid, self.res)
 
-    @botcmd
+    @jabberbot.botcmd
     def ping(self, mess, args):
         self.log.debug('Received ping command over Jabber channel')
         return 'pong'
         
-    @botcmd
+    @jabberbot.botcmd
     def pushed(self, mess, args):
         self.log.debug('Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom()))
         if mess.getFrom() == str(self.jid) + '/' + self.res:
@@ -172,12 +171,12 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             with lock:
                 handler.protected_pull()
 
-    @botcmd
+    @jabberbot.botcmd
     def login(self, mess, args):
         """The bot sends a "login" message first. ignore it"""
         return
 
-    @botcmd
+    @jabberbot.botcmd
     def unknown(self, mess, args):
         """Should somebody say something that is not a command, all bots will
         reply with "Unknown command...." to which all bots will reply that thay
