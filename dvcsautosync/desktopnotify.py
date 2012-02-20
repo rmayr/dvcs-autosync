@@ -140,16 +140,18 @@ try:
             self._icon = gtk.IconTheme().load_icon(name, size, lookup)
 
         def notify(self, level, title, text, timeout=float('inf')):
+            """
+            :param timeout: show notification for 'n' seconds
+            """
             urgency = self._level_to_level_id(level)
             if urgency is None:
                 return
 
             notification = pynotify.Notification(title, text)
-            logging.error("MOO"+title+str(urgency))
             if timeout <= 0:
                 raise ValueError, "Timeout must be larger than zero (this permits positive infinity)."
             elif timeout < float('inf'):
-                notification.set_timeout(timeout)
+                notification.set_timeout(timeout*1000)
 
             if self._icon:
                 notification.set_icon_from_pixbuf(self._icon)
