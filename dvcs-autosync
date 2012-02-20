@@ -139,7 +139,7 @@ class AutosyncJabberBot(jabberbot.JabberBot):
 
     def stop_serving(self):
         self._running = False
-        if self._thread:
+        if hasattr(self., '_thread'):
 	    self._thread.join()
 
     def on_ping_timeout(self):
