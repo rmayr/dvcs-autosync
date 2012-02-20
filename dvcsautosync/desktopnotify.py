@@ -153,8 +153,8 @@ try:
 
             if self._icon:
                 notification.set_icon_from_pixbuf(self._icon)
-                notification.set_urgency(urgency)
-                notification.show()
+            notification.set_urgency(urgency)
+            notification.show()
             return notification
 
     desktopnotifer = PyNotify('autosync application')
