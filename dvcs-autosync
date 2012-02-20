@@ -29,6 +29,7 @@ __license__ = 'GPL v2 or v3'
 
 # Imports for various platforms and error handling concerning optional Python modules
 import warnings, sys, os, time, subprocess, threading, fnmatch, ConfigParser, logging
+import platform
 
 from dvcsautosync import Notifier, jabberbot # private jabberbot copy for now
 
@@ -522,15 +523,7 @@ if __name__ == '__main__':
 	if xmppnotify and not alsonotify:
 	    logging.warning('XMPP notification requested, but alsonotify option not configured, will not send XMPP notifications')
 
-        try:
-            import win32api
-            hostname = win32api.GetComputerName()
-        except:
-            try:
-                hostname = os.uname()[1]
-            except:
-                hostname = "UNSUPPORTED_OS"
-	
+        hostname = platform.node() if platform.node() else "unnamed host"
 	res = 'AutosyncJabberBot on %s' % hostname
 	try:
 	    with warnings.catch_warnings():
