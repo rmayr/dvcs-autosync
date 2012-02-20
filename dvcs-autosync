@@ -31,7 +31,11 @@ __license__ = 'GPL v2 or v3'
 import warnings, sys, os, time, subprocess, threading, fnmatch, ConfigParser, logging
 import platform
 
+# set up the logger already here, before any imports try to log
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
 from dvcsautosync import Notifier, jabberbot # private jabberbot copy for now
+# Support for desktop notifications
+from dvcsautosync import desktopnotifer
 
 # do not care about deprecation warnings right now, as they are only
 # confusing for users
@@ -64,17 +68,16 @@ hostname = None
 username = None
 pidfile = None
 
-desktop_notifiers = []
+desktop_notifier = None
 
 def printmsg(title, msg, level=logging.INFO):
-    for desktop_notifier in desktop_notifiers:
-        try:
-            # Way too much notifications are created for it to be reasonable to
-            # require the user to close all notifications. Hence the 5 second
-            # timeout.
-            desktop_notifier.notify(level, title, msg, timeout=5)
-        except:
-            pass
+    try:
+        # Way too much notifications are created for it to be reasonable to
+        # require the user to close all notifications. Hence the 5 second
+        # timeout.
+        desktop_notifier.notify(level, title, msg, timeout=5)
+    except:
+        pass
     try:
         if xmppnotify and bot and alsonotify:
             bot.send(alsonotify, '[%s]: %s' % (title, msg))
@@ -382,8 +385,6 @@ def config_get (section, option, optional=False):
     return ret
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
-    
     config = ConfigParser.RawConfigParser()
     defaultcfgpath = os.path.expanduser('~/.autosync')
     if len(sys.argv) >= 2:
@@ -450,29 +451,9 @@ if __name__ == '__main__':
 	logging.info('Disabling all notification methods, will only log to console')
     else:
 	logging.warning('Unknown notifymethod "%s" configured, will keep default (desktop)', notifymethod)
-    
+
     if not notifymethod or notifymethod in ('desktop', 'all'):
-        # Support for desktop notifications
-        import desktopnotify
-
-        try:
-            desktop_notifiers.append(desktopnotify.KNotify())
-            logging.debug('KNotify initialized successfully, will use desktop notifications')
-        except:
-            logging.debug('KDE4 KNotify does not seem to run or dbus is not installed')
-
-        try:
-            desktop_notifiers.append(desktopnotify.PyNotify('autosync application'))
-            desktop_notifiers[-1].load_icon('dvcs-autosync', 48)
-            logging.debug('PyNotify initialized successfully, will use desktop notifications')
-        except:
-            logging.debug('PyNotify does not seem to be installed or intialization failed')
-
-        try:
-            desktop_notifiers.append(desktopnotify.GrowlNotifier('AutoSync', ['Every notifications'], applicationIcon=os.path.abspath('/usr/share/icons/hicolor/48x48/apps/dvcs-autosync.png')))
-            logging.debug('Growl initialized successfully, will use desktop notifications')
-        except:
-            logging.debug('Growl does not seem to be installed')
+        desktop_notifier = desktopnotifer
 
     pulllock = config_get('autosync', 'pulllock')
     if pulllock == 'conservative':

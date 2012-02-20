@@ -9,7 +9,7 @@
 # it under the terms of the GNU Lesser General Public License as published by
 # the Free Software Foundation; either version 2 or 3 of the License.
 # ============================================================================
-__all__ = ["Notifier", "jabberbot"]
+__all__ = ["Notifier", "jabberbot", "desktopnotifer"]
 import warnings
 from sys import platform
 
@@ -34,3 +34,6 @@ elif platform.startswith('darwin'):
 else:
     raise Exception("Unknown OS. Please report this value to the "
                     "dvcs-autosync developers: %s" % platform)
+
+# Make desktopnotify available
+from .desktopnotify import desktopnotifer
