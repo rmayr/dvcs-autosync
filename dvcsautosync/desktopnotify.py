@@ -1,6 +1,9 @@
 # vim: set et sts=4 sw=4:
 import logging
 
+# desktopnotify will point to a class instance containing a .notify() function
+desktopnotifer = None
+
 class INotify(object):
     @classmethod
     def _level_to_level_id(cls, level):
@@ -33,6 +36,7 @@ class INotify(object):
         """
         raise NotImplementedError
 
+#Set up the the KDE notifier
 try:
     import dbus
     _bus = dbus.SessionBus()
@@ -110,8 +114,12 @@ try:
                 `contexts`: list of variants
             """
             _knotify.reemit(id, contexts)
+
+    desktopnotifer = KNotify()
+    logging.debug('KDE desktop notify available.')
 except:
     pass
+
 
 try:
     import pynotify, gtk
@@ -132,6 +140,9 @@ try:
             self._icon = gtk.IconTheme().load_icon(name, size, lookup)
 
         def notify(self, level, title, text, timeout=float('inf')):
+            """
+            :param timeout: show notification for 'n' seconds
+            """
             urgency = self._level_to_level_id(level)
             if urgency is None:
                 return
@@ -140,13 +151,17 @@ try:
             if timeout <= 0:
                 raise ValueError, "Timeout must be larger than zero (this permits positive infinity)."
             elif timeout < float('inf'):
-                notification.set_timeout(timeout)
+                notification.set_timeout(timeout*1000)
 
             if self._icon:
                 notification.set_icon_from_pixbuf(self._icon)
-                notification.set_urgency(urgency)
-                notification.show()
+            notification.set_urgency(urgency)
+            notification.show()
             return notification
+
+    desktopnotifer = PyNotify('autosync application')
+    desktopnotifer.load_icon('dvcs-autosync', 48)
+    logging.debug('GTK pynotify desktop notify available.')
 except:
     pass
 
@@ -174,5 +189,13 @@ try:
             self._notifier.notify('Every notifications', title, text, self._icon)
             # When sending multiple notifications at the same time, Growl seems to only consider the latest. This little delay prevent that.
             time.sleep(0.1)
+
+    desktopnotifer = GrowlNotifier('AutoSync', ['Every notifications'],
+                                   applicationIcon=os.path.abspath('/usr/share/icons/hicolor/48x48/apps/dvcs-autosync.png'))
+    logging.debug('Growl desktop notify available.')
 except:
     pass
+
+#if desktopnotier is still "None", no backend was available.
+if not desktopnotifer:
+    logging.debug('No Desktop notify backend available.')

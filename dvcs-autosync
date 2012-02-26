@@ -14,6 +14,7 @@
 # * evgeni@golov.de: Various bugfixes
 # * Giel van Schijndel: refactoring for better modularization of platform
 #   dependent code
+# * Sebastian Spaeth: refactoring & cleanup
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by
@@ -29,8 +30,19 @@ __license__ = 'GPL v2 or v3'
 
 # Imports for various platforms and error handling concerning optional Python modules
 import warnings, sys, os, time, subprocess, threading, fnmatch, ConfigParser, logging
+import platform
 
-from dvcsautosync.filenotifier import Notifier
+# set up the logger already here, before any imports try to log
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
+from dvcsautosync import Notifier, jabberbot # private jabberbot copy for now
+# Support for desktop notifications
+from dvcsautosync import desktopnotifer
+
+# do not care about deprecation warnings right now, as they are only
+# confusing for users
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
+    import xmpp
 
 if not hasattr(subprocess, 'check_output'):
     # see https://gist.github.com/839684
@@ -49,13 +61,6 @@ if not hasattr(subprocess, 'check_output'):
     subprocess.check_output = check_output
 
 
-# do not care about deprecation warnings right now, as they are only confusing for users
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore",category=DeprecationWarning)
-    import xmpp
-    import dvcsautosync.jabberbot as jabberbot # private copy for now
-    from dvcsautosync.jabberbot import botcmd
-
 # some global variables, will be initialized in main
 xmppnotify = False
 notifier = None
@@ -64,17 +69,16 @@ hostname = None
 username = None
 pidfile = None
 
-desktop_notifiers = []
+desktop_notifier = None
 
 def printmsg(title, msg, level=logging.INFO):
-    for desktop_notifier in desktop_notifiers:
-        try:
-            # Way too much notifications are created for it to be reasonable to
-            # require the user to close all notifications. Hence the 5 second
-            # timeout.
-            desktop_notifier.notify(level, title, msg, timeout=5)
-        except:
-            pass
+    try:
+        # Way too much notifications are created for it to be reasonable to
+        # require the user to close all notifications. Hence the 5 second
+        # timeout.
+        desktop_notifier.notify(level, title, msg, timeout=5)
+    except:
+        pass
     try:
         if xmppnotify and bot and alsonotify:
             bot.send(alsonotify, '[%s]: %s' % (title, msg))
@@ -152,17 +156,17 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             self.log.warning('Received an error while trying to send message. Will send it later.')
             self._unsent.append((user, text, in_reply_to, message_type))
   
-    @botcmd
+    @jabberbot.botcmd
     def whoami(self, mess, args):
         """Tells you your username"""
         return 'You are %s, I am %s/%s' % (mess.getFrom(), self.jid, self.res)
 
-    @botcmd
+    @jabberbot.botcmd
     def ping(self, mess, args):
         self.log.debug('Received ping command over Jabber channel')
         return 'pong'
         
-    @botcmd
+    @jabberbot.botcmd
     def pushed(self, mess, args):
         self.log.debug('Received pushed command over Jabber channel with args %s from %s' % (args, mess.getFrom()))
         if mess.getFrom() == str(self.jid) + '/' + self.res:
@@ -172,12 +176,12 @@ class AutosyncJabberBot(jabberbot.JabberBot):
             with lock:
                 handler.protected_pull()
 
-    @botcmd
+    @jabberbot.botcmd
     def login(self, mess, args):
         """The bot sends a "login" message first. ignore it"""
         return
 
-    @botcmd
+    @jabberbot.botcmd
     def unknown(self, mess, args):
         """Should somebody say something that is not a command, all bots will
         reply with "Unknown command...." to which all bots will reply that thay
@@ -382,8 +386,6 @@ def config_get (section, option, optional=False):
     return ret
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
-    
     config = ConfigParser.RawConfigParser()
     defaultcfgpath = os.path.expanduser('~/.autosync')
     if len(sys.argv) >= 2:
@@ -450,29 +452,9 @@ if __name__ == '__main__':
 	logging.info('Disabling all notification methods, will only log to console')
     else:
 	logging.warning('Unknown notifymethod "%s" configured, will keep default (desktop)', notifymethod)
-    
+
     if not notifymethod or notifymethod in ('desktop', 'all'):
-        # Support for desktop notifications
-        import desktopnotify
-
-        try:
-            desktop_notifiers.append(desktopnotify.KNotify())
-            logging.debug('KNotify initialized successfully, will use desktop notifications')
-        except:
-            logging.debug('KDE4 KNotify does not seem to run or dbus is not installed')
-
-        try:
-            desktop_notifiers.append(desktopnotify.PyNotify('autosync application'))
-            desktop_notifiers[-1].load_icon('dvcs-autosync', 48)
-            logging.debug('PyNotify initialized successfully, will use desktop notifications')
-        except:
-            logging.debug('PyNotify does not seem to be installed or intialization failed')
-
-        try:
-            desktop_notifiers.append(desktopnotify.GrowlNotifier('AutoSync', ['Every notifications'], applicationIcon=os.path.abspath('/usr/share/icons/hicolor/48x48/apps/dvcs-autosync.png')))
-            logging.debug('Growl initialized successfully, will use desktop notifications')
-        except:
-            logging.debug('Growl does not seem to be installed')
+        desktop_notifier = desktopnotifer
 
     pulllock = config_get('autosync', 'pulllock')
     if pulllock == 'conservative':
@@ -523,15 +505,7 @@ if __name__ == '__main__':
 	if xmppnotify and not alsonotify:
 	    logging.warning('XMPP notification requested, but alsonotify option not configured, will not send XMPP notifications')
 
-        try:
-            import win32api
-            hostname = win32api.GetComputerName()
-        except:
-            try:
-                hostname = os.uname()[1]
-            except:
-                hostname = "UNSUPPORTED_OS"
-	
+        hostname = platform.node() if platform.node() else "unnamed host"
 	res = 'AutosyncJabberBot on %s' % hostname
 	try:
 	    with warnings.catch_warnings():
