@@ -6,6 +6,9 @@ Version 0.6
    from the former.
  * Refactoring by Giel van Schijndel: Move desktop notification and file change
    monitoring into own modules for better modularization. 
+ * Refactoring by Sebastian Spaeth: Create our own dvcs-autosync Python module
+   for cleaner cross-platform installation via setup.py and create a new 
+   Autosync class in the main script to get rid of some global variables.
 
 Version 0.5
  * Added Windows and Mac OS/X ports (thanks to Philipp Tölke and Olivier 
