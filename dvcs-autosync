@@ -356,7 +356,7 @@ class FileChangeHandler():
             self._ignore_events = True
 
         with lock:
-            handler._exec_cmd(cmds['push'])
+            handler._exec_cmd(cmds['pull'])
 
         if conservative_pull_lock:
             # pull done, now start handling events again
