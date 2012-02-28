@@ -180,10 +180,7 @@ try:
             self._notifier = Growl.GrowlNotifier(applicationName, notifications, defaultNotifications, self._icon, hostname, password)
             self._notifier.register()
 
-            super(PyNotify, self).__init__()
-
-        def load_icon(self, name, size, lookup=gtk.ICON_LOOKUP_GENERIC_FALLBACK):
-            self.icon = gtk.IconTheme().load_icon(name, size, lookup)
+            super(GrowlNotifier, self).__init__()
 
         def notify(self, level, title, text, timeout=float('inf')):
             self._notifier.notify('Every notifications', title, text, self._icon)
