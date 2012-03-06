@@ -166,18 +166,12 @@ except:
     pass
 
 try:
-    import Growl
+    from gntp import notifier
     import os, time
     class GrowlNotifier(INotify):
         def __init__(self, applicationName=None, notifications=None, defaultNotifications=None, applicationIcon=None, hostname=None, password=None):
             self._icon = applicationIcon
-            if isinstance(applicationIcon, basestring):
-                if os.path.exists(applicationIcon):
-                    self._icon = Growl.Image.imageFromPath(applicationIcon)
-                else:
-                    self._icon = None
-
-            self._notifier = Growl.GrowlNotifier(applicationName, notifications, defaultNotifications, self._icon, hostname, password)
+            self._notifier = notifier.GrowlNotifier(applicationName, notifications, defaultNotifications, self._icon, hostname, password)
             self._notifier.register()
 
             super(GrowlNotifier, self).__init__()
