@@ -13,23 +13,18 @@ Install dvcs-autosync
 Install xmpppy
 ------------------------
 
- * Download the latest version here : http://xmpppy.sourceforge.net/
- * Untar & `cd` to its folder
- * `sudo python setup.py install`
+ * `sudo easy_install xmpppy`
 
 Install MacFSEvents
 ------------------------
 
- * `git clone https://github.com/malthe/macfsevents.git`
- * `cd macfsevents`
- * `sudo python setup.py install`
+ * `sudo easy_install macfsevents`
  
 Install Growl python binding
 ------------------------
 
  * Make sure you have Growl installed (or install it from growl.info)
- * `cd` to `growl-python` folder of this repository (or download the Growl SDK on growl.info)
- * `sudo python setup.py install`
+ * `sudo easy_install gntp`
  * After the first launch, you will be able to configure (or disable) notifications in the Growl preferences pane.
 
 Run dvcs-autosync
