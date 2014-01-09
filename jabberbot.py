@@ -34,6 +34,8 @@ import time
 import inspect
 import logging
 import traceback
+import urllib
+import urlparse
 
 __author__ = 'Thomas Perl <m@thp.io>'
 __version__ = '0.13'
@@ -137,7 +139,16 @@ class JabberBot(object):
             else:
                 conn = xmpp.Client(self.jid.getDomain(), debug = [])
 
-            conres = conn.connect()
+            proxy = urllib.getproxies().get('xmpp')
+            if proxy:
+                proxy = urlparse.urlparse(proxy)
+                proxy = {
+                        'host': proxy.hostname,
+                        'port': proxy.port,
+                        'user': proxy.username,
+                        'password': proxy.password,
+                    }
+            conres = conn.connect(proxy=proxy)
             if not conres:
                 self.log.error('unable to connect to server %s.' % self.jid.getDomain())
                 return None
