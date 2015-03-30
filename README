@@ -45,7 +45,7 @@ Mac OS X:
 Recommended:
 
  * Pynotify (for desktop notifications on linux)
- * Growl python binding (for desktop notifications on Mac OS X, included in this repository)
+ * GNTP (for desktop notifications on Mac OS X)
 
 Installation
 ------------------------
