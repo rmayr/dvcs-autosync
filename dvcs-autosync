@@ -63,7 +63,6 @@ if not hasattr(subprocess, 'check_output'):
 
 # some global variables, will be initialized in main
 xmppnotify = False
-notifier = None
 bot = None
 hostname = None
 username = None
@@ -418,6 +417,26 @@ class Autosync(object):
         if self.pidfile and os.path.exists(self.pidfile):
             os.remove(self.pidfile)
 
+    def set_notifier(self, notifier):
+        """Set the notifier used to be notified about file changes"""
+        self.notifier = notifier
+
+    def run(self):
+        """Invokes and runs the loop"""
+        logging.info('--------------------------------------------------------')
+        try:
+            while True:
+                self.notifier.process_events()
+                self.notifier.check_events()
+                self.notifier.read_events()
+        except KeyboardInterrupt:
+            logging.info('You pressed Ctrl+C, exiting gracefully!')
+
+        self.notifier.stop()
+
+        # Remove the pidfile after a clean shutdown.
+        self.remove_pid_file()
+
 
 if __name__ == '__main__':
     autosync = Autosync()
@@ -546,8 +565,6 @@ if __name__ == '__main__':
     # this is a central lock for guarding repository operations
     lock = threading.RLock()
 
-    notifier = Notifier(path, ignoreabsolutepaths, ignorefilepatterns, handler, readfrequency)
-
     logging.info('Executing startup synchronizaion')
     if syncmethod != 'none':
 	handler.protected_pull()
@@ -555,22 +572,11 @@ if __name__ == '__main__':
     if not conservative_pull_lock or syncmethod == 'none':
         # only need to run the startup command here when not using conservative pull locking - otherwise the protected_pull will already do it
         handler.startup()
-    
-    logging.info('----------------------------------------------------------------')
 
-    try:
-        while True:
-            notifier.process_events()
-            notifier.check_events()
-            notifier.read_events()
-    except KeyboardInterrupt:
-        logging.info('You pressed Ctrl+C, exiting gracefully!')
-
-    if notifier:
-        notifier.stop()
+    autosync.set_notifier(Notifier(path, ignoreabsolutepaths,
+                                 ignorefilepatterns,
+                                 handler, readfrequency))
+    autosync.run()
     if bot:
         bot.stop_serving()
-
-    # Remove the pidfile after a clean shutdown.
-    autosync.remove_pid_file()
     sys.exit(0)
