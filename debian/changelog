@@ -1,3 +1,9 @@
+dvcs-autosync (0.7) UNRELEASED; urgency=low
+
+  * More refactoring and cleanup, no major changes in functionality.
+
+ -- René Mayrhofer rmayr@debian.oef>  Mon, 30 Mar 2015 20:49:23 +0200
+
 dvcs-autosync (0.6) unstable; urgency=low
 
   * Code refactoring for better modularization and minor shutdown and

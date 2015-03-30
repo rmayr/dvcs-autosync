@@ -1,5 +1,6 @@
 Version 0.7
  * Refactoring by Sebastian Spaeth: Stuff the main loop into Autosync.run().
+ * Update Mac desktop notifier binding by turl.
 
 Version 0.6
  * Minor fixes (logging typo and remove hardcoded /usr/share path in setup.py) 

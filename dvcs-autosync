@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # ============================================================================
-# Copyright René Mayrhofer, 2010-2012
+# Copyright René Mayrhofer, 2010-205
 #
 # Contributors:
 # * Dieter Plaetinck: documentation and bug fixes, launcher script, config
@@ -24,7 +24,7 @@
 from __future__ import with_statement
 
 __author__ = 'René Mayrhofer <rene@mayrhofer.eu.org>'
-__version__ = '0.6'
+__version__ = '0.7'
 __website__ = 'http://www.mayrhofer.eu.org/dvcs-autosync'
 __license__ = 'GPL v2 or v3'
 
