@@ -5,6 +5,14 @@ dvcs-autosync (0.5.1) unstable; urgency=low
 
  -- Rene Mayrhofer <rmayr@debian.org>  Mon, 05 Sep 2011 15:41:02 +0200
 
+dvcs-autosync (0.5+nmu1) unstable; urgency=medium
+
+  * Non-maintainer upload.
+  * Build with dh-python instead of python-support.  Closes: #786133
+  * Specify X-Python-Versions: >= 2.6.  Closes: #639650
+
+ -- Mattia Rizzolo <mattia@debian.org>  Sun, 13 Dec 2015 01:26:20 +0000
+
 dvcs-autosync (0.5) unstable; urgency=low
 
   * Added icon for dvcs-autosync for pynotify (notification 'bubbles')

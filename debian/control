@@ -2,11 +2,12 @@ Source: dvcs-autosync
 Section: utils
 Priority: optional
 Maintainer: Rene Mayrhofer <rmayr@debian.org>
-Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7.0.50~), python-support, git
+Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7.0.50~), dh-python, python, git
 Standards-Version: 3.9.2
 Homepage: http://www.mayrhofer.eu.org/dvcs-autosync
 Vcs-Git: git://gitorious.org/dvcs-autosync/dvcs-autosync.git
 Vcs-Browser: http://gitorious.org/dvcs-autosync
+X-Python-Version: >= 2.6
 
 Package: dvcs-autosync
 Architecture: all
