@@ -5,14 +5,14 @@ Maintainer: Rene Mayrhofer <rmayr@debian.org>
 Build-Depends: cdbs (>= 0.4.49), debhelper (>= 7.0.50~), dh-python, python, git
 Standards-Version: 3.9.2
 Homepage: http://www.mayrhofer.eu.org/dvcs-autosync
-Vcs-Git: git://gitorious.org/dvcs-autosync/dvcs-autosync.git
-Vcs-Browser: http://gitorious.org/dvcs-autosync
-X-Python-Version: >= 2.6
+Vcs-Git: git@github.com:rmayr/dvcs-autosync.git
+Vcs-Browser: https://github.com/rmayr/dvcs-autosync
+X-Python-Version: >= 3.0
 
 Package: dvcs-autosync
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}, 
-         python-pyinotify, python-xmpp, python (>= 2.6)
+         python3-pyinotify, python3-sleekxmpp, python3
 Recommends: python-notify
 Description: Automatically synchronize distributed version control repositories
  dvcs-autosync is an open source replacement for Dropbox/Wuala/Box.net/etc. 

@@ -27,7 +27,7 @@ import sys
 try:
     import xmpp
 except ImportError:
-    print >>sys.stderr, 'You need to install xmpppy from http://xmpppy.sf.net/.'
+    print('You need to install xmpppy from http://xmpppy.sf.net/.', file=sys.stderr)
     sys.exit(-1)
 
 import time
@@ -141,14 +141,14 @@ class JabberBot(object):
             if not conres:
                 self.log.error('unable to connect to server %s.' % self.jid.getDomain())
                 return None
-            if conres<>'tls':
+            if conres!='tls':
                 self.log.warning('unable to establish secure connection - TLS failed!')
 
             authres = conn.auth(self.jid.getNode(), self.__password, self.res)
             if not authres:
                 self.log.error('unable to authorize with server.')
                 return None
-            if authres<>'sasl':
+            if authres!='sasl':
                 self.log.warning("unable to perform SASL auth os %s. Old authentication method used!" % self.jid.getDomain())
 
             conn.sendInitPresence()
@@ -202,25 +202,25 @@ class JabberBot(object):
         tune.setNamespace(NS_TUNE)
 
         title = None
-        if song.has_key('title'):
+        if 'title' in song:
             title = song['title']
-        elif song.has_key('file'):
+        elif 'file' in song:
             title = os.path.splitext(os.path.basename(song['file']))[0]
         if title is not None:
             tune.addChild('title').addData(title)
-        if song.has_key('artist'):
+        if 'artist' in song:
             tune.addChild('artist').addData(song['artist'])
-        if song.has_key('album'):
+        if 'album' in song:
             tune.addChild('source').addData(song['album'])
-        if song.has_key('pos') and song['pos'] > 0:
+        if 'pos' in song and song['pos'] > 0:
             tune.addChild('track').addData(str(song['pos']))
-        if song.has_key('time'):
+        if 'time' in song:
             tune.addChild('length').addData(str(song['time']))
-        if song.has_key('uri'):
+        if 'uri' in song:
             tune.addChild('uri').addData(song['uri'])
 
         if debug:
-            print 'Sending tune:', iq.__str__().encode('utf8')
+            print('Sending tune:', iq.__str__().encode('utf8'))
         self.conn.send(iq)
 
     def send(self, user, text, in_reply_to=None, message_type='chat'):
@@ -262,7 +262,7 @@ class JabberBot(object):
             try:
                 html.addChild(node=xmpp.simplexml.XML2Node("<body xmlns='http://www.w3.org/1999/xhtml'>" + text.encode('utf-8') + "</body>"))
                 message.addChild(node=html)
-            except Exception, e:
+            except Exception as e:
                 # Didn't work, incorrect markup or something.
                 # print >> sys.stderr, e, text
                 message = xmpp.protocol.Message(body=text_plain)
@@ -293,7 +293,7 @@ class JabberBot(object):
 
         If the parameter 'only_available' is True, the broadcast
         will not go to users whose status is not 'Available'."""
-        for jid, (show, status) in self.__seen.items():
+        for jid, (show, status) in list(self.__seen.items()):
             if not only_available or show is self.AVAILABLE:
                 self.send(jid, message)
 
@@ -323,11 +323,11 @@ class JabberBot(object):
             self.status_type_changed(jid, self.OFFLINE)
 
         try:
-            subscription = self.roster.getSubscription(unicode(jid.__str__()))
-        except KeyError, e:
+            subscription = self.roster.getSubscription(str(jid.__str__()))
+        except KeyError as e:
             # User not on our roster
             subscription = None
-        except AttributeError, e:
+        except AttributeError as e:
             # Recieved presence update before roster built
             return
 
@@ -403,7 +403,7 @@ class JabberBot(object):
         # Ignore messages from users not seen by this bot
         if jid not in self.__seen:
             self.log.info('Ignoring message from unseen guest: %s' % jid)
-            self.log.debug("I've seen: %s" % ["%s" % x for x in self.__seen.keys()])
+            self.log.debug("I've seen: %s" % ["%s" % x for x in list(self.__seen.keys())])
             return
 
         # Remember the last-talked-in thread for replies
@@ -416,10 +416,10 @@ class JabberBot(object):
         cmd = command.lower()
         self.log.debug("*** cmd = %s" % cmd)
 
-        if self.commands.has_key(cmd):
+        if cmd in self.commands:
             try:
                 reply = self.commands[cmd](mess, args)
-            except Exception, e:
+            except Exception as e:
                 reply = traceback.format_exc(e)
                 self.log.exception('An error happened while processing a message ("%s") from %s: %s"' % (text, jid, reply))
         else:
@@ -476,7 +476,7 @@ class JabberBot(object):
 
             usage = '\n'.join(sorted([
                 '%s: %s' % (name, (command.__doc__.strip() or '(undocumented)').split('\n', 1)[0])
-                for (name, command) in self.commands.iteritems() if name != 'help' and not command._jabberbot_hidden
+                for (name, command) in self.commands.items() if name != 'help' and not command._jabberbot_hidden
             ]))
             usage = usage + '\n\nType help <command name> to get more info about that specific command.'
         else:
@@ -511,7 +511,7 @@ class JabberBot(object):
                 #logging.debug('Got response: ' + str(res))
                 if res is None:
                     self.on_ping_timeout()
-            except IOError, e:
+            except IOError as e:
                 logging.error('Error pinging the server: %s, treating as ping timeout.' % e)
                 self.on_ping_timeout()
 
