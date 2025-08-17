@@ -1,3 +1,6 @@
+NOTE: MOVED TO https://codeberg.org/rmayr/dvcs-autosync because Github is now a subsidiary of Microsoft AI stuff.
+===
+
 What does it do?
 ------------------------
 Automatically keep DVCS repositories in sync whenever changes happen by automatically committing and pushing/pulling.
